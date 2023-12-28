@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools >= 61.0", "pytest"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages]
+find = {}
+
+[project]
+name = "q100bench"
+version = "0.1"
+authors = [
+  { name="Nancy F. Hansen", email="nhansen@mail.nih.gov" },
+]
+description = "A package for comparing a test genome to the diploid Q100 benchmark"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+  'pysam >= 0.20',
+  'pybedtools >= 0.9',
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+license = {file = "LICENSE"}
+
+[project.scripts]
+q100bench = "q100bench.bench:main"
+
+[project.urls]
+"Homepage" = "https://github.com/nhansen/q100bench"
+"Bug Tracker" = "https://github.com/nhansen/q100bench/issues"
+
