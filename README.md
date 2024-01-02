@@ -8,7 +8,7 @@ The program was written by Nancy Fisher Hansen, a staff scientist in the Genome 
 
 Until q100bench is available on PyPi and bioconda, the easiest way to use it is to install it locally. First clone this github repository:
 ```
-git clone git://github.com/nhansen/q100bench
+git clone https://github.com/nhansen/q100bench
 cd q100bench
 ```
 
