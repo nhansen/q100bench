@@ -1,0 +1,3 @@
+resourcedir: /data/Phillippy/projects/HG002_diploid/benchmarking/region_beds
+mononucruns: /data/Phillippy/projects/HG002_diploid/benchmarking/region_beds/v1.0.1.mnr10.bed
+hetsitevariants: /data/Phillippy/projects/HG002_diploid/benchmarking/region_beds/v1.0.1.hetsites.bed

@@ -7,9 +7,6 @@ import argparse
 from pybedtools import BedTool
 from pathlib import Path
 from collections import namedtuple
-
-#sys.path.insert(0, '/data/Phillippy/projects/HG002_diploid/benchmarking/software')
-
 from q100bench import bedtoolslib
 from q100bench import errors
 from q100bench import output
@@ -58,9 +55,9 @@ def init_argparse() -> argparse.ArgumentParser:
 
     return parser
 
-def parse_arguments():
+def parse_arguments(args):
     parser = init_argparse()
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     return args
 
@@ -84,7 +81,7 @@ def read_config_data(args)->dict:
 
 def main() -> None:
 
-    args = parse_arguments()
+    args = parse_arguments(sys.argv[1:])
     check_for_bedtools()
     no_rscript = check_for_R()
     outputdir = output.create_output_directory(args)
