@@ -1,2 +1,31 @@
 # q100bench
-Python package for comparing a test genome to the diploid Q100 benchmark
+
+The q100bench python package analyses a user-supplied alignment of a test assembly to a benchmark, and prints general statistics, BED-formatted regions regarding the alignments, and PDF-formatted plots.
+
+The program was written by Nancy Fisher Hansen, a staff scientist in the Genome Informatics Section at the National Human Genome Research Institute (NHGRI). Nancy can be reached at nhansen@mail.nih.gov.
+
+## Install
+
+Until q100bench is available on PyPi and bioconda, the easiest way to use it is to install it locally. First clone this github repository:
+```
+git clone git://github.com/nhansen/q100bench
+cd q100bench
+```
+
+Create a virtual environment for the project:
+```
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Finally use python's pip installer to install and test a development copy for yourself to run:
+```
+python3 -m pip install -e .
+pytest
+```
+
+### Dependencies
+
+This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots. All other dependencies are installed by the pip installer with the commands in the previous section. Feel free to post installation issues to the issues section of this github repository.
+
+
