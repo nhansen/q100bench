@@ -1,7 +1,7 @@
 import os
 
 def plot_benchmark_align_coverage(assemblyname:str, outputdir:str, resourcedir:str):
-    plotcommand = "Rscript /data/Phillippy/projects/HG002_diploid/benchmarking/software/BenchCoveragePlot.R " + assemblyname + " " + outputdir + " " + resourcedir
+    plotcommand = "Rscript /data/Phillippy/tools/q100bench/q100bench/BenchCoveragePlot.R " + assemblyname + " " + outputdir + " " + resourcedir
     returnvalue = os.system(plotcommand)
     return returnvalue
 

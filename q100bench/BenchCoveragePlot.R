@@ -9,10 +9,10 @@ library(stringr)
 library(karyoploteR)
 args = commandArgs(trailingOnly=TRUE)
 
-genomename <- ifelse(!( is.na(args[1])), args[1], "year1mat")
+genomename <- ifelse(!( is.na(args[1])), args[1], "test")
 outputdir <- ifelse(!( is.na(args[2])), args[2], "./")
 resourcedir <- ifelse(!( is.na(args[3])), args[3], "./")
-plottitle <- ifelse(!( is.na(args[4])), args[4], paste(c("v1.0.1 aligned coverage vs. ", genomename), sep="", collapse=""))
+plottitle <- ifelse(!( is.na(args[4])), args[4], paste(c("Benchmark aligned coverage vs. ", genomename), sep="", collapse=""))
 genomefile <- paste(c(resourcedir, "/v1.0.1.genome.bed"), sep="", collapse="")
 benchgenome <- toGRanges(genomefile)
 
@@ -20,7 +20,7 @@ maternalchroms <- paste0("chr", c(1:22, "X"), "_MATERNAL")
 paternalchroms <- paste0("chr", c(1:22, "Y"), "_PATERNAL")
 chroms <- c(maternalchroms, paternalchroms)
 
-benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.v1.0.1.merged.bed"), sep="", collapse="")
+benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.truth.merged.bed"), sep="", collapse="")
 benchcoveredranges <- toGRanges(benchcoveredfile)
 benchcovereddf <- read.table(benchcoveredfile, header=FALSE, sep="\t")
 
@@ -31,7 +31,7 @@ pp <- getDefaultPlotParams(plot.type=1)
 pp$ideogramheight <- 100
 pp$topmargin <- 300
 
-plotname <- paste(c(outputdir, "/", genomename, ".benchcovered.v1.0.1.pdf"), sep="", collapse="")
+plotname <- paste(c(outputdir, "/", genomename, ".benchcovered.truth.pdf"), sep="", collapse="")
 pdf(plotname, 8.5, 11.0)
 aligncolor <- ifelse(str_detect(benchcovereddf$V1, "MAT"), "green", "blue")
 kp <- plotKaryotype(genome=benchgenome, plot.type=1, chromosomes=chroms, main=plottitle, cex=0.5, plot.params=pp)
