@@ -288,7 +288,7 @@ def write_mononuc_stats(mononucstats:dict, bedfiles:dict, benchmark_stats:dict, 
     generalstatsfile = bedfiles["generalstatsfile"]
     with open(generalstatsfile, "a") as gsfh:
         gsfh.write("\nMononucleotide run accuracy:\n\n")
-        gsfh.write("Total number of v1.0.1 mononucleotide runs of ten or more bases covered by " + args.assembly + " alignments: " + str(totalcoveredmononucs) + "\n")
+        gsfh.write("Total number of true assembly mononucleotide runs of ten or more bases covered by " + args.assembly + " alignments: " + str(totalcoveredmononucs) + "\n")
         perccorrect = round(100*totalcorrect/totalcoveredmononucs, 3)
         gsfh.write("Number of mononucleotide runs correct in assembly: " + str(totalcorrect) + " (" + str(perccorrect) + "%)" + "\n")
         percphaseswitch = round(100*totalphaseswitches/totalcoveredmononucs, 3)

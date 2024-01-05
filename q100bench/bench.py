@@ -5,6 +5,7 @@ import shutil
 import pysam
 import argparse
 from pybedtools import BedTool
+import importlib.resources
 from pathlib import Path
 from collections import namedtuple
 from q100bench import bedtoolslib
@@ -66,16 +67,32 @@ def read_config_data(args)->dict:
     configpath = Path(configfile)
 
     configvals = {}
-    with configpath.open("r") as cr:
-        configline = cr.readline()
-        while configline:
-            p = re.compile(r'^([^#\s]+):+\s+(\S+)$')
-            match = p.match(configline)
-            if match:
-                key = match.group(1)
-                value = match.group(2)
-                configvals[key] = value
+    if not configpath.exists():
+        print("Using resource locations from default config file")
+        template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
+        with importlib.resources.as_file(template_res) as configfile:
+            with open(configfile, "r") as cr:
+                configline = cr.readline()
+                while configline:
+                    p = re.compile(r'^([^#\s]+):+\s+(\S+)$')
+                    match = p.match(configline)
+                    if match:
+                        key = match.group(1)
+                        value = match.group(2)
+                        configvals[key] = value
+                    configline = cr.readline()
+    else:
+        print("Using resource locations from " + configfile)
+        with open(configfile, "r") as cr:
             configline = cr.readline()
+            while configline:
+                p = re.compile(r'^([^#\s]+):+\s+(\S+)$')
+                match = p.match(configline)
+                if match:
+                    key = match.group(1)
+                    value = match.group(2)
+                    configvals[key] = value
+                configline = cr.readline()
 
     return configvals
 

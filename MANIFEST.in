@@ -1,0 +1,2 @@
+include q100bench/*.R
+include q100bench/benchconfig.txt
