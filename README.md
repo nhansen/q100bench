@@ -26,7 +26,7 @@ pytest
 
 ### Dependencies
 
-This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots.
+This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots, and [bedtools](https://bedtools.readthedocs.io/en/latest/) to compare and merge intervals.
 
 In addition, the program requires various BED-formatted files with data about the benchmark assembly. For the Q100 assembly hg002v1.0.1, a tarball of these files is available on [AWS](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/polishing/HG002/v1.0/benchmark/resources/hg002v1.0.1.resources.tar.gz). Once downloaded, the tarball should be unpacked and the locations of files should be included in the config file passed to the program.
 
