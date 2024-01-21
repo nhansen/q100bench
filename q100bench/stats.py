@@ -61,12 +61,12 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
             totalns = totalns + gaplength
 
         numcontigs = len(contiglist)
-        contig_n50 = None
-        contig_hap1_ng50 = None
-        contig_hap2_ng50 = None
-        contig_l50 = None
-        contig_hap1_lg50 = None
-        contig_hap1_lg50 = None
+        contig_n50 = 0
+        contig_hap1_ng50 = 0
+        contig_hap2_ng50 = 0
+        contig_l50 = 0
+        contig_hap1_lg50 = 0
+        contig_hap2_lg50 = 0
         contig_hap1_aung = 0
         contig_hap2_aung = 0
         numlargecontigs = 0
