@@ -72,7 +72,7 @@ def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
                 start = chromseq.find(findstring)
                 while start != -1:
                     end = start + args.minns
-                    while chromseq[end] == 'N':
+                    while end < refend and chromseq[end] == 'N':
                         end = end + 1
                     if end - start >= args.minns:
                         if n_bedfile:
@@ -89,7 +89,6 @@ def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
                 #endfindn = time.time()
                 #print("Find ns time new way for chrom %s: %s" % (ref, endfindn - startfindn))
 
-                refend = queryobj.get_reference_length(ref)
                 contigname = ref + "." + str(contignum)
                 contig_intervals.append(bedinterval(chrom=ref, start=contigstart, end=refend, name=contigname, rest=""))
         if n_bedfile:
