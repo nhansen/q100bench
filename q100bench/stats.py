@@ -29,12 +29,12 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
 
         cumscaffbases = 0
         numscaffs = 0
-        scaffold_n50 = None
-        scaffold_hap1_ng50 = None
-        scaffold_hap2_ng50 = None
-        scaffold_l50 = None
-        scaffold_hap1_lg50 = None
-        scaffold_hap2_lg50 = None
+        scaffold_n50 = 0
+        scaffold_hap1_ng50 = 0
+        scaffold_hap2_ng50 = 0
+        scaffold_l50 = 0
+        scaffold_hap1_lg50 = 0
+        scaffold_hap2_lg50 = 0
         scaffold_hap1_aung = 0
         scaffold_hap2_aung = 0
         scaffold_lengths = queryobj.lengths
@@ -43,13 +43,13 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
         for scafflength in scaffold_lengths:
             cumscaffbases = cumscaffbases + scafflength
             numscaffs = numscaffs + 1
-            if cumscaffbases > 0.5*totalscaffoldbases and scaffold_n50 is None:
+            if cumscaffbases > 0.5*totalscaffoldbases and scaffold_n50 == 0:
                 scaffold_n50 = scafflength
                 scaffold_l50 = numscaffs
-            if cumscaffbases > 0.5*hap1totalbases and scaffold_hap1_ng50 is None:
+            if cumscaffbases > 0.5*hap1totalbases and scaffold_hap1_ng50 == 0:
                 scaffold_hap1_ng50 = scafflength
                 scaffold_hap1_lg50 = numscaffs
-            if cumscaffbases > 0.5*hap2totalbases and scaffold_hap2_ng50 is None:
+            if cumscaffbases > 0.5*hap2totalbases and scaffold_hap2_ng50 == 0:
                 scaffold_hap2_ng50 = scafflength
                 scaffold_hap2_lg50 = numscaffs
             scaffold_hap1_aung = scaffold_hap1_aung + scafflength*scafflength/hap1totalbases
@@ -85,13 +85,13 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
         for contigsize in sizelist:
             cumcontigbases = cumcontigbases + contigsize
             numcontigs = numcontigs + 1
-            if cumcontigbases > 0.5*totalsize and contig_n50 is None:
+            if cumcontigbases > 0.5*totalsize and contig_n50 == 0:
                 contig_n50 = contigsize
                 contig_l50 = numcontigs
-            if cumcontigbases > 0.5*hap1totalbases and contig_hap1_ng50 is None:
+            if cumcontigbases > 0.5*hap1totalbases and contig_hap1_ng50 == 0:
                 contig_hap1_ng50 = contigsize
                 contig_hap1_lg50 = numcontigs
-            if cumcontigbases > 0.5*hap2totalbases and contig_hap2_ng50 is None:
+            if cumcontigbases > 0.5*hap2totalbases and contig_hap2_ng50 == 0:
                 contig_hap2_ng50 = contigsize
                 contig_hap2_lg50 = numcontigs
             contig_hap1_aung = contig_hap1_aung + contigsize*contigsize/hap1totalbases
@@ -157,20 +157,20 @@ def write_aligned_stats(refobj, queryobj, truthints, mergedtruthints, mergedtest
 
     hap1totalbases = bmstats['hap1totalbases'] # total MATERNAL bases in benchmark
 
-    hap1_nga50 = None
-    hap1_lga50 = None
-    hap1_nga90 = None
-    hap1_lga90 = None
+    hap1_nga50 = 0
+    hap1_lga50 = 0
+    hap1_nga90 = 0
+    hap1_lga90 = 0
     hap1_aunga = 0
     for truthint in sorted(mergedtruthints, key=lambda h: int(h[2]) - int(h[1]), reverse=True):
         alignlength = int(truthint[2]) - int(truthint[1])
         totalrefaligned = totalrefaligned + alignlength
         numberrefaligns = numberrefaligns + 1
 
-        if totalrefaligned >= 0.5*hap1totalbases and hap1_nga50 is None:
+        if totalrefaligned >= 0.5*hap1totalbases and hap1_nga50 == 0:
             hap1_nga50 = alignlength
             hap1_lga50 = numberrefaligns
-        if totalrefaligned >= 0.9*hap1totalbases and hap1_nga90 is None:
+        if totalrefaligned >= 0.9*hap1totalbases and hap1_nga90 == 0:
             hap1_nga90 = alignlength
             hap1_lga90 = numberrefaligns
         hap1_aunga = hap1_aunga + alignlength*alignlength/hap1totalbases
