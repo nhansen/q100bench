@@ -149,7 +149,7 @@ def main() -> None:
     # plot alignment coverage across assembly and genome:
     if not no_rscript:
         print("Creating plots")
-        plots.plot_benchmark_align_coverage(args.assembly, outputdir, benchparams["resourcedir"])
+        plots.plot_benchmark_align_coverage(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
         plots.plot_testassembly_align_coverage(args.assembly, outputdir, benchparams["resourcedir"])
         plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
 

@@ -10,9 +10,10 @@ library(karyoploteR)
 args = commandArgs(trailingOnly=TRUE)
 
 genomename <- ifelse(!( is.na(args[1])), args[1], "test")
-outputdir <- ifelse(!( is.na(args[2])), args[2], "./")
-resourcedir <- ifelse(!( is.na(args[3])), args[3], "./")
-plottitle <- ifelse(!( is.na(args[4])), args[4], paste(c("Benchmark aligned coverage vs. ", genomename), sep="", collapse=""))
+benchname <- ifelse(!( is.na(args[2])), args[2], "truth")
+outputdir <- ifelse(!( is.na(args[3])), args[3], "./")
+resourcedir <- ifelse(!( is.na(args[4])), args[4], "./")
+plottitle <- ifelse(!( is.na(args[5])), args[5], paste(c("Benchmark aligned coverage vs. ", genomename), sep="", collapse=""))
 genomefile <- paste(c(resourcedir, "/v1.0.1.genome.bed"), sep="", collapse="")
 benchgenome <- toGRanges(genomefile)
 
