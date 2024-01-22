@@ -21,7 +21,7 @@ maternalchroms <- paste0("chr", c(1:22, "X"), "_MATERNAL")
 paternalchroms <- paste0("chr", c(1:22, "Y"), "_PATERNAL")
 chroms <- c(maternalchroms, paternalchroms)
 
-benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.truth.merged.bed"), sep="", collapse="")
+benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.", benchname, ".merged.bed"), sep="", collapse="")
 benchcoveredranges <- toGRanges(benchcoveredfile)
 benchcovereddf <- read.table(benchcoveredfile, header=FALSE, sep="\t")
 
@@ -37,9 +37,8 @@ pdf(plotname, 8.5, 11.0)
 aligncolor <- ifelse(str_detect(benchcovereddf$V1, "MAT"), "green", "blue")
 kp <- plotKaryotype(genome=benchgenome, plot.type=1, chromosomes=chroms, main=plottitle, cex=0.5, plot.params=pp)
 kpAddBaseNumbers(kp, tick.dist = 20000000, tick.len = 10, cex=0.3)
-kpRect(kp, data=benchcoveredranges, col=aligncolor, data.panel="ideogram", y0=rep(0, length(benchcoveredranges)), y1=rep(1, length(benchcoveredranges)))
-
 kpRect(kp, data=nlocranges, col="red", data.panel="ideogram", y0=rep(0, length(nlocranges)), y1=rep(1, length(nlocranges)))
+kpRect(kp, data=benchcoveredranges, col=aligncolor, data.panel="ideogram", y0=rep(0, length(benchcoveredranges)), y1=rep(1, length(benchcoveredranges)))
 
 legend("bottomright", c("Maternal", "Paternal", "Ns"), fill=c("green", "blue", "red"))
 

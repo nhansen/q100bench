@@ -130,6 +130,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
     alignopindex = 0
     reflength = refend - refstart + 1
     querylength = queryend - querystart + 1
+    matchns = re.compile("[nN]")
     while refcurrentoffset <= refend-refstart and alignopindex < len(alignops):
         alignop = alignops[alignopindex]
         op = alignop[0]
@@ -139,7 +140,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             for blockoffset in range(oplength):
                 refpos = refcurrentoffset + blockoffset
                 querypos = querycurrentoffset + blockoffset
-                if refseq[refpos] != queryseq[querypos]:
+                if refseq[refpos] != queryseq[querypos] and refseq[refpos] != "N" and queryseq[querypos] != "N":
                     if strand == 'F':
                         querycoordinate = querypos + querystart
                     else:
@@ -165,9 +166,11 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 querycoordinate = querystart + querycurrentoffset
             else:
                 querycoordinate = queryend - querycurrentoffset
-            variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
-            additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+oplength+extend) + "\t0,0,0\t" + alignstring
-            variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+oplength+extend, name=variantname, rest=additionalfields ))
+
+            if not (matchns.match(queryallele) or matchns.match(refallele)):
+                variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
+                additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+oplength+extend) + "\t0,0,0\t" + alignstring
+                variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+oplength+extend, name=variantname, rest=additionalfields ))
 
         if op == 1:
             refallele = "*"
@@ -185,9 +188,11 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 querycoordinate = querystart + querycurrentoffset
             else:
                 querycoordinate = queryend - querycurrentoffset
-            variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
-            additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extend) + "\t0,0,0\t" + alignstring
-            variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+extend, name=variantname, rest=additionalfields ))
+            
+            if not (matchns.match(queryallele) or matchns.match(refallele)):
+                variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
+                additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extend) + "\t0,0,0\t" + alignstring
+                variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+extend, name=variantname, rest=additionalfields ))
 
 
         # advance current positions: cases where reference coord advances (MDN=X):

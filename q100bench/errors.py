@@ -1,4 +1,5 @@
 import re
+import sys
 from collections import namedtuple
 
 # create namedtuple for bed intervals:
@@ -14,8 +15,10 @@ def classify_errors(refobj, queryobj, refcovered, querycovered, variants, output
             hetsiteline = hetsiteline.rstrip()
             [chrom, start, end, name] = hetsiteline.split("\t")
             namefields = name.split("_")
-            refallele = namefields[-2]
-            altallele = namefields[-1]
+            #refallele = namefields[-2]
+            #altallele = namefields[-1]
+            refallele = namefields[-3]
+            altallele = namefields[-2]
             hetsitename = chrom + "_" + str(int(start) + 1) + "_" + refallele + "_" + altallele 
             hetsites[hetsitename] = bedinterval(chrom=chrom, start=str(start), end=str(end), name=name, rest='')
             hetsiteline = hfh.readline()
@@ -70,6 +73,13 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
                     newlength = runlength - len(refbases)
                     result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
                     sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + variant_type + "\n")
+                elif p[repeatedbase].match(refbases) and p[repeatedbase].match(altbases): # expanded notation
+                    newlength = len(altbases)
+                    reflength = len(refbases)
+                    if reflength != runlength:
+                        print("Mononuc var reflength doesn\'t match benchmark run length at " + chrom + ":" + str(start) + "-" + str(end), file=sys.stderr)
+                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + variant_type + "\n")
+                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
                 else: # complex error
                     newlength = -1
                     result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
