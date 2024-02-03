@@ -32,15 +32,15 @@ def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
     else:
         ofh = open(user_n_file, "r")
 
-    n_intervals = []
-    contig_intervals = []
+    gapbedstring = ""
+    contigbedstring = ""
     n_interval_dict = {}
     # if an n interval file has been specified in the command line options, read it:
     if user_n_file:
         nbed_line = ofh.readline()
         while nbed_line:
             [chrom, start, end, gapname] = nbed_line.split("\t")
-            n_intervals.append(bedinterval(chrom=chrom, start=int(start), end=int(end), name=gapname, rest=""))
+            gapbedstring += nbed_line
             if chrom in n_interval_dict.keys():
                 n_interval_dict[chrom].append(bedinterval(chrom=chrom, start=int(start), end=int(end), name=gapname, rest=""))
             else:
@@ -54,12 +54,12 @@ def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
             contigstart = 0
             for interval in n_interval_dict[ref]:
                 interval_name = ref + "." + str(contignum)
-                contig_intervals.append(bedinterval(chrom=ref, start=contigstart, end=interval.start, name=interval_name, rest=""))
+                contigbedstring += chrom + "\t" + str(contigstart) + "\t" + str(interval.start) + "\t" + interval_name + "\t" + rest
                 contignum = contignum + 1
                 contigstart = interval.end
             refend = queryobj.get_reference_length(ref)
             interval_name = ref + "." + str(contignum)
-            contig_intervals.append(bedinterval(chrom=ref, start=contigstart, end=refend, name=interval_name, rest=""))
+            contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + interval_name + "\t" + rest
     else:
         for ref in queryobj.references:
             contignum = 1
@@ -77,28 +77,25 @@ def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
                     if end - start >= args.minns:
                         if n_bedfile:
                             gapname = "N." + ref + "." + str(contignum)
-                            nfh.write(ref + "\t" + str(start) + "\t" + str(end) + "\t" + gapname + "\n")
-                            n_intervals.append(bedinterval(chrom=ref, start=start, end=end, name=gapname, rest=""))
+                            gapstring = ref + "\t" + str(start) + "\t" + str(end) + "\t" + gapname + "\n"
+                            nfh.write(gapstring)
+                            gapbedstring += gapstring
                         contigend = start
                         contigname = ref + "." + str(contignum)
-                        contig_intervals.append(bedinterval(chrom=ref, start=contigstart, end=contigend, name=contigname, rest=""))
+                        contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(contigend) + "\t" + contigname + "\n"
                         contignum = contignum + 1
                         contigstart = end
                     start = chromseq.find(findstring, end, refend)
 
-                #endfindn = time.time()
-                #print("Find ns time new way for chrom %s: %s" % (ref, endfindn - startfindn))
-
                 contigname = ref + "." + str(contignum)
-                contig_intervals.append(bedinterval(chrom=ref, start=contigstart, end=refend, name=contigname, rest=""))
+                contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + contigname + "\n"
         if n_bedfile:
             nfh.close()
     if atgc_bedfile:
-        for interval in contig_intervals:
-            atgcfh.write(interval.chrom + "\t" + str(interval.start) + "\t" + str(interval.end) + "\t" + interval.name + "\n")
+        atgcfh.write(contigbedstring)
         atgcfh.close()
 
-    return [contig_intervals, n_intervals]
+    return [pybedtools.BedTool(contigbedstring, from_string = True), pybedtools.BedTool(gapbedstring, from_string = True)]
 
 def revcomp(seq:str) -> str:
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', 'M': 'N', 'K': 'N', 'R': 'N', 'W': 'N', 'Y': 'N'}

@@ -15,8 +15,6 @@ def classify_errors(refobj, queryobj, refcovered, querycovered, variants, output
             hetsiteline = hetsiteline.rstrip()
             [chrom, start, end, name] = hetsiteline.split("\t")
             namefields = name.split("_")
-            #refallele = namefields[-2]
-            #altallele = namefields[-1]
             refallele = namefields[-3]
             altallele = namefields[-2]
             hetsitename = chrom + "_" + str(int(start) + 1) + "_" + refallele + "_" + altallele 
@@ -24,6 +22,10 @@ def classify_errors(refobj, queryobj, refcovered, querycovered, variants, output
             hetsiteline = hfh.readline()
 
     bencherrorfile = outputdict["bencherrortypebed"]
+
+    testerrorfile = outputdict["testerrortypebed"]
+    tfh = open(testerrorfile, "w")
+
     with open(bencherrorfile, "w") as efh:
         for variant in variants:
             namefields = variant.name.split("_")
@@ -32,12 +34,15 @@ def classify_errors(refobj, queryobj, refcovered, querycovered, variants, output
             altallele = namefields[-2]
             alignstrand = namefields[-1]
             varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
+
             if varname in hetsites.keys():
                 errortype = 'PHASING'
             else:
                 errortype = 'CONSENSUS'
     
             efh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t" + errortype + "\n")
+            tfh.write(str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortype + "\n")
+    tfh.close()
 
     return bencherrorfile
 

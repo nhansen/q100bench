@@ -1,7 +1,7 @@
 import re
 import math
 
-def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:list, gaplist:list, args)->dict:
+def write_general_assembly_stats(generalstatspath, refobj, queryobj, contigsbed, gapsbed, args)->dict:
 
     bmstats = {}
 
@@ -56,11 +56,11 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
             scaffold_hap2_aung = scaffold_hap2_aung + scafflength*scafflength/hap2totalbases
 
         totalns = 0
-        for gap in gaplist:
-            gaplength = gap.end - gap.start
+        for gap in gapsbed:
+            gaplength = len(gap)
             totalns = totalns + gaplength
 
-        numcontigs = len(contiglist)
+        numcontigs = len(contigsbed)
         contig_n50 = 0
         contig_hap1_ng50 = 0
         contig_hap2_ng50 = 0
@@ -72,8 +72,8 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
         numlargecontigs = 0
         sizelist = []
         totalsize = 0
-        for contig in contiglist:
-            contiglength = contig.end - contig.start
+        for contig in contigsbed:
+            contiglength = len(contig)
             if contiglength >= mincontiglength:
                 numlargecontigs = numlargecontigs + 1
                 sizelist.append(contiglength)
@@ -144,7 +144,7 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contiglist:
 
     return bmstats
 
-def write_aligned_stats(refobj, queryobj, truthints, mergedtruthints, mergedtestmatints, mergedtestpatints, bedfiles:dict, bmstats:dict, args)->dict:
+def write_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, bedfiles:dict, bmstats:dict, args)->dict:
 
     generalstatsfile = bedfiles["generalstatsfile"]
 
@@ -162,8 +162,8 @@ def write_aligned_stats(refobj, queryobj, truthints, mergedtruthints, mergedtest
     hap1_nga90 = 0
     hap1_lga90 = 0
     hap1_aunga = 0
-    for truthint in sorted(mergedtruthints, key=lambda h: int(h[2]) - int(h[1]), reverse=True):
-        alignlength = int(truthint[2]) - int(truthint[1])
+    for truthint in sorted(mergedtruthcoveredbed, key=lambda h: len(h), reverse=True):
+        alignlength = len(truthint)
         totalrefaligned = totalrefaligned + alignlength
         numberrefaligns = numberrefaligns + 1
 
@@ -177,10 +177,11 @@ def write_aligned_stats(refobj, queryobj, truthints, mergedtruthints, mergedtest
 
     matbenchcovered = 0
     patbenchcovered = 0
-    for truthint in mergedtruthints:
+    for truthint in mergedtruthcoveredbed:
         [chrom, start, end, name] = truthint
-        start = int(start)
-        end = int(end)
+        chrom = truthint.chrom
+        start = int(truthint.start)
+        end = int(truthint.stop)
         totalbenchcovered = totalbenchcovered + end - start
         if phap1.match(chrom):
             matbenchcovered = matbenchcovered + end - start
@@ -190,16 +191,14 @@ def write_aligned_stats(refobj, queryobj, truthints, mergedtruthints, mergedtest
     longesttestalignment = 0
     totaltestmatcovered = 0
     totaltestpatcovered = 0
-    for testint in mergedtestmatints:
-        [chrom, start, end, name] = testint
-        alignlength = int(end) - int(start)
+    for testint in mergedtestmatcoveredbed:
+        alignlength = len(testint)
         totaltestmatcovered = totaltestmatcovered + alignlength
         if alignlength > longesttestalignment:
             longesttestalignment = alignlength
 
-    for testint in mergedtestpatints:
-        [chrom, start, end, name] = testint
-        alignlength = int(end) - int(start)
+    for testint in mergedtestpatcoveredbed:
+        alignlength = len(testint)
         totaltestpatcovered = totaltestpatcovered + alignlength
         if alignlength > longesttestalignment:
             longesttestalignment = alignlength

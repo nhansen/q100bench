@@ -11,8 +11,8 @@ bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest'
 # and so will be greater than query right when strand is reversed--all four are 1-based
 def write_bedfiles(bamobj, refobj, queryobj, testmatbed, testpatbed, truthbed, variantbed, args):
 
-    queryintervals = []
-    refintervals = []
+    refcoveredstring = ""
+    querycoveredstring = ""
     user_variantfile = args.variantfile
     variants = []
 
@@ -30,25 +30,28 @@ def write_bedfiles(bamobj, refobj, queryobj, testmatbed, testpatbed, truthbed, v
             querynamestring = query + "." + str(queryleft) + "." + str(queryright)
             refnamestring = ref + "." + str(refstart) + "." + str(refend) + "." + strand
             #print(querynamestring + ", " + refnamestring)
-            queryintervals.append(bedinterval(chrom=query, start=querystart - 1, end=queryend, name=refnamestring, rest=''))
-            refintervals.append(bedinterval(chrom=ref, start=refstart - 1, end=refend, name=querynamestring, rest=''))
+            querycoveredstring += query + "\t" + str(querystart - 1) + "\t" + str(queryend) + "\t" + refnamestring + "\n"
+            refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
             if user_variantfile is None:
                 variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand))
+
+    refcoveredbed = pybedtools.BedTool(refcoveredstring, from_string = True)
+    querycoveredbed = pybedtools.BedTool(querycoveredstring, from_string = True)
 
     phap1 = re.compile(r'.*MAT.*')
     phap2 = re.compile(r'.*PAT.*')
     with open(testmatbed, "w") as tmb:
-        for testtuple in sorted(queryintervals, key=lambda h: (h.chrom, h.start, h.end)):
+        for testtuple in sorted(querycoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
             if phap1.match(testtuple.name):
                 tmb.write(testtuple.chrom + "\t" + str(testtuple.start) + "\t" + str(testtuple.end) + "\t" + testtuple.name + "\n")
 
     with open(testpatbed, "w") as tpb:
-        for testtuple in sorted(queryintervals, key=lambda h: (h.chrom, h.start, h.end)):
+        for testtuple in sorted(querycoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
             if phap2.match(testtuple.name):
                 tpb.write(testtuple.chrom + "\t" + str(testtuple.start) + "\t" + str(testtuple.end) + "\t" + testtuple.name + "\n")
 
     with open(truthbed, "w") as rb:
-        for truthtuple in sorted(refintervals, key=lambda h: (h.chrom, h.start, h.end)):
+        for truthtuple in sorted(refcoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
             rb.write(truthtuple.chrom + "\t" + str(truthtuple.start) + "\t" + str(truthtuple.end) + "\t" + truthtuple.name + "\n")
 
     if user_variantfile is None:
@@ -65,7 +68,7 @@ def write_bedfiles(bamobj, refobj, queryobj, testmatbed, testpatbed, truthbed, v
                 variants.append(bedinterval(chrom=chrom, start=str(start), end=str(end), name=name, rest=''))
                 variantline = vh.readline()
 
-    return [refintervals, queryintervals, variants]
+    return [refcoveredbed, querycoveredbed, variants]
 
 def retrieve_align_data(align, args)->list:
     if align.is_reverse:
