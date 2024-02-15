@@ -5,21 +5,7 @@ from collections import namedtuple
 # create namedtuple for bed intervals:
 bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
 
-def classify_errors(refobj, queryobj, refcovered, querycovered, variants, outputdict, benchparams, args)->str:
-    hetsitefile = benchparams["hetsitevariants"]
-
-    hetsites = {}
-    with open(hetsitefile, "r") as hfh:
-        hetsiteline = hfh.readline()
-        while hetsiteline:
-            hetsiteline = hetsiteline.rstrip()
-            [chrom, start, end, name] = hetsiteline.split("\t")
-            namefields = name.split("_")
-            refallele = namefields[-3]
-            altallele = namefields[-2]
-            hetsitename = chrom + "_" + str(int(start) + 1) + "_" + refallele + "_" + altallele 
-            hetsites[hetsitename] = bedinterval(chrom=chrom, start=str(start), end=str(end), name=name, rest='')
-            hetsiteline = hfh.readline()
+def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparams, args)->str:
 
     bencherrorfile = outputdict["bencherrortypebed"]
 
@@ -32,15 +18,20 @@ def classify_errors(refobj, queryobj, refcovered, querycovered, variants, output
             pos = int(namefields[-4])
             refallele = namefields[-3]
             altallele = namefields[-2]
-            alignstrand = namefields[-1]
+            if namefields[-1] == "F":
+                alignstrand = '+'
+            else:
+                alignstrand = '-'
             varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
 
             if varname in hetsites.keys():
                 errortype = 'PHASING'
+                errortypecolor = '255,0,0'
             else:
                 errortype = 'CONSENSUS'
+                errortypecolor = '0,0,255'
     
-            efh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t" + errortype + "\n")
+            efh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.name + "\n")
             tfh.write(str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortype + "\n")
     tfh.close()
 
@@ -59,7 +50,7 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
         mononucline = mfh.readline()
         while mononucline:
             mononucline = mononucline.rstrip()
-            [chrom, start, end, name, score, strand, widestart, wideend, color, chrom_b, start_b, end_b, variant_name, variant_type] = mononucline.split("\t")
+            [chrom, start, end, name, score, strand, widestart, wideend, color, chrom_b, start_b, end_b, variant_name, score_b, strand_b, widestart_b, wideend_b, color_b, variant_type, queryvariantname] = mononucline.split("\t")
             runlength = int(end) - int(start)
             namefields = name.split("_")
             repeatedbase = namefields[-1]

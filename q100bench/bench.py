@@ -23,13 +23,13 @@ bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest'
 
 def check_for_bedtools():
     if shutil.which("bedtools") is None:
-        print("You don\'t seem to have bedtools in your path. Please install bedtools")
+        sys.print("You don\'t seem to have bedtools in your path. Please install bedtools", file=stderr)
         exit(1)
     return 0
 
 def check_for_R():
     if shutil.which("Rscript") is None:
-        print("You don\'t seem to have Rscript in your path. Plots will not be generated")
+        print("You don\'t seem to have Rscript in your path. Plots will not be generated", file=stderr)
         return 1
     return 0
 
@@ -42,7 +42,8 @@ def init_argparse() -> argparse.ArgumentParser:
         "-v", "--version", action="version",
         version = f"{parser.prog} version 0.1.0"
     )
-    parser.add_argument('-b', '--bam', required=True, help='bam file of alignments to search for perfectly aligned segments')
+    parser.add_argument('-b', '--bam', required=False, default=None, help='bam file of alignments of the test (haploid) assembly to the diploid benchmark')
+    parser.add_argument('--paf', required=False, default=None, help='paf-formatted file of alignments of the test (haploid) assembly to the diploid benchmark')
     parser.add_argument('-r', '--reffasta', type=str, required=True, help='(indexed) fasta file for benchmark reference')
     parser.add_argument('-q', '--queryfasta', type=str, required=True, help='(indexed) fasta file for test assembly')
     parser.add_argument('-p', '--prefix', type=str, required=True, help='prefix for output directory name')
@@ -60,6 +61,10 @@ def init_argparse() -> argparse.ArgumentParser:
 def parse_arguments(args):
     parser = init_argparse()
     args = parser.parse_args(args)
+
+    if not args.bam and not args.paf:
+        sys.print("Must specify either a bam file with --bam or a paf file with --paf", file=sys.stderr)
+        exit(1)
 
     return args
 
@@ -105,7 +110,16 @@ def main() -> None:
     outputdir = output.create_output_directory(args)
     benchparams = read_config_data(args)
 
-    alignobj = pysam.AlignmentFile(args.bam, "rb")
+    hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
+    hetarrays = phasing.sort_chrom_hetsite_arrays(hetsites)
+
+    alignobj = None
+    pafaligns = None
+    if args.bam:
+        alignobj = pysam.AlignmentFile(args.bam, "rb")
+    else:
+        pafaligns = alignparse.read_paf_aligns(args.paf)
+
     refobj = pysam.FastaFile(args.reffasta)
     queryobj = pysam.FastaFile(args.queryfasta)
 
@@ -119,7 +133,7 @@ def main() -> None:
     benchmark_stats = stats.write_general_assembly_stats(outputfiles["generalstatsfile"], refobj, queryobj, testcontigbed, testgapbed, args)
 
     print("Writing bed files of regions covered by alignments of " + args.assembly + " to " + args.benchmark)
-    [refcoveredbed, querycoveredbed, variants] = alignparse.write_bedfiles(alignobj, refobj, queryobj, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["variantbed"], args)
+    [refcoveredbed, querycoveredbed, variants] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["variantbed"], outputfiles["coveredhetsitealleles"], args)
 
     # create merged unique outputfiles:
     [mergedtruthcoveredbed, outputfiles["mergedtruthcovered"]] = bedtoolslib.mergebed(outputfiles["truthcovered"])
@@ -129,27 +143,32 @@ def main() -> None:
     print("Writing primary alignment statistics about " + args.assembly + " assembly")
     benchmark_stats = stats.write_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
 
-    # classify variant errors as phasing or novel errors:
-    print("Determining whether errors are switched haplotype or novel")
-    variantfile = errors.classify_errors(refobj, queryobj, refcoveredbed, querycoveredbed, variants, outputfiles, benchparams, args)
-    stats.write_qv_stats(benchmark_stats, variantfile, outputfiles, args)
+    if alignobj is not None:
+        # classify variant errors as phasing or novel errors:
+        print("Determining whether errors are switched haplotype or novel")
+        #stats.write_het_stats(outputfiles, args)
+        variantfile = errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, args)
+        stats.write_qv_stats(benchmark_stats, variantfile, outputfiles, args)
 
-    # measure het phasing across chromosomes:
-    print("Evaluating phasing of heterozygous sites across chromosomes")
+        # measure het phasing across chromosomes:
+        #print("Evaluating phasing of heterozygous sites across chromosomes")
+        #[coveredhetbed, coveredhetfile] = bedtoolslib.intersectbed(benchparams["hetsitevariants"], outputfiles["truthcovered"], outputfile=outputfiles["coveredhetsitealleles"], writefirst=True)
+        #phasing.assess_het_sites(alignobj, refobj, queryobj, coveredhetbed, args)
 
-    # evaluate mononucleotide runs:
-    print("Assessing accuracy of mononucleotide runs")
-    bedtoolslib.intersectbed(benchparams["mononucruns"], outputfiles["mergedtruthcovered"], outputfile=outputfiles["coveredmononucsfile"], writefirst=True)
-    mononucswithvariantsbedfile = bedtoolslib.intersectbed(outputfiles["coveredmononucsfile"], outputfiles["bencherrortypebed"], outputfiles["mononucswithvariantsfile"], outerjoin=True, writeboth=True)
-    mononucstats = errors.gather_mononuc_stats(outputfiles["mononucswithvariantsfile"], outputfiles["mononucstatsfile"])
-    stats.write_mononuc_stats(mononucstats, outputfiles, benchmark_stats, args)
+        # evaluate mononucleotide runs:
+        print("Assessing accuracy of mononucleotide runs")
+        bedtoolslib.intersectbed(benchparams["mononucruns"], outputfiles["mergedtruthcovered"], outputfile=outputfiles["coveredmononucsfile"], writefirst=True)
+        mononucswithvariantsbedfile = bedtoolslib.intersectbed(outputfiles["coveredmononucsfile"], outputfiles["bencherrortypebed"], outputfiles["mononucswithvariantsfile"], outerjoin=True, writeboth=True)
+        mononucstats = errors.gather_mononuc_stats(outputfiles["mononucswithvariantsfile"], outputfiles["mononucstatsfile"])
+        stats.write_mononuc_stats(mononucstats, outputfiles, benchmark_stats, args)
     
     # plot alignment coverage across assembly and genome:
     if not no_rscript:
         print("Creating plots")
         plots.plot_benchmark_align_coverage(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
         plots.plot_testassembly_align_coverage(args.assembly, outputdir, benchparams["resourcedir"])
-        plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
+        if alignobj is not None:
+            plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
 
 
 if __name__ == "__main__":

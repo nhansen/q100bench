@@ -254,7 +254,7 @@ def write_qv_stats(benchmark_stats:dict, variantfile:str, bedfiles:dict, args):
         errorline = vfh.readline()
         while errorline:
             errorline = errorline.rstrip()
-            [chrom, start, end, name, errortype] = errorline.split("\t")
+            [chrom, start, end, name, score, strand, widestart, wideend, color, errortype, varname] = errorline.split("\t")
             namefields = name.split("_")
             refallele = namefields[-2]
             altallele = namefields[-1]
@@ -361,3 +361,18 @@ def write_mononuc_stats(mononucstats:dict, bedfiles:dict, benchmark_stats:dict, 
         gsfh.write("Number of mononucleotide runs with erroneous alleles other than extensions or contractions: " + str(totalcomplex) + " (" + str(perccomplex) + "%)" + "\n")
 
     return 0
+
+def write_het_stats(bedfiles:dict, args):
+
+    hetbedfile = bedfiles["coveredhetsitealleles"]
+    with open(hetbedfile, "r") as hfh:
+        hetline = hfh.readline()
+        while hetline:
+            hetline = hetline.rstrip()
+            [chrom, start, end, name, score, strand, widestart, wideend, color, errortype, varname] = hetline.split("\t")
+            namefields = name.split("_")
+            refallele = namefields[-2]
+            altallele = namefields[-1]
+            refallelelength = len(refallele) # these lengths are wrong when allele is "*"--should replace
+            altallelelength = len(altallele) # these lengths are wrong when allele is "*"--should replace
+

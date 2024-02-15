@@ -31,6 +31,7 @@ def intersectbed(bedfile1:str, bedfile2:str, outputfile:str, writefirst=False, w
     if outerjoin:
         command = command + " -loj"
     os.system(command + " > " + outputfile)
+    intersectbed = pybedtools.bedtool.BedTool(outputfile)
 
-    return outputfile
+    return [intersectbed, outputfile]
 

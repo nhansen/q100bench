@@ -3,37 +3,62 @@ import pysam
 import pybedtools
 from collections import namedtuple
 from q100bench import seqparse
+from q100bench import phasing
 
 # create namedtuple for bed intervals:
 bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
 
 # query start is always less than query end regardless of strand. query left always corresponds to ref start, 
 # and so will be greater than query right when strand is reversed--all four are 1-based
-def write_bedfiles(bamobj, refobj, queryobj, testmatbed, testpatbed, truthbed, variantbed, args):
+def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, testpatbed, truthbed, variantbed, hetallelebed, args):
 
     refcoveredstring = ""
     querycoveredstring = ""
     user_variantfile = args.variantfile
     variants = []
+    hetsitealleles = {}
 
-    for align in bamobj.fetch():
-        if align.is_secondary:
-            continue
-        if align.reference_length >= args.minalignlength:
-            query, querystart, queryend, ref, refstart, refend, strand = retrieve_align_data(align, args)
-            if strand == "F":
+    if bamobj is not None:
+        for align in bamobj.fetch():
+            if align.is_secondary:
+                continue
+            if align.reference_length >= args.minalignlength:
+                query, querystart, queryend, ref, refstart, refend, strand = retrieve_align_data(align, args)
+                if strand == "F":
+                    queryleft = querystart
+                    queryright = queryend
+                else:
+                    queryleft = queryend
+                    queryright = querystart
+                querynamestring = query + "." + str(queryleft) + "." + str(queryright)
+                refnamestring = ref + "." + str(refstart) + "." + str(refend) + "." + strand
+                #print(querynamestring + ", " + refnamestring)
+                querycoveredstring += query + "\t" + str(querystart - 1) + "\t" + str(queryend) + "\t" + refnamestring + "\n"
+                refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
+                if user_variantfile is None:
+                    variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles))
+    else:
+        for pafdict in pafaligns:
+            # all start/endpoints are 1-based
+            query = pafdict['query']
+            querystart = pafdict['querystart']
+            queryend = pafdict['queryend']
+            if querystart < queryend:
                 queryleft = querystart
                 queryright = queryend
             else:
                 queryleft = queryend
                 queryright = querystart
+            ref = pafdict['target']
+            refstart = pafdict['targetstart']
+            refend = pafdict['targetend']
+            strand = pafdict['strand']
+
             querynamestring = query + "." + str(queryleft) + "." + str(queryright)
             refnamestring = ref + "." + str(refstart) + "." + str(refend) + "." + strand
             #print(querynamestring + ", " + refnamestring)
             querycoveredstring += query + "\t" + str(querystart - 1) + "\t" + str(queryend) + "\t" + refnamestring + "\n"
             refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
-            if user_variantfile is None:
-                variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand))
 
     refcoveredbed = pybedtools.BedTool(refcoveredstring, from_string = True)
     querycoveredbed = pybedtools.BedTool(querycoveredstring, from_string = True)
@@ -54,6 +79,8 @@ def write_bedfiles(bamobj, refobj, queryobj, testmatbed, testpatbed, truthbed, v
         for truthtuple in sorted(refcoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
             rb.write(truthtuple.chrom + "\t" + str(truthtuple.start) + "\t" + str(truthtuple.end) + "\t" + truthtuple.name + "\n")
 
+    phasing.write_hetallele_bed(hetsitealleles, hetallelebed)
+
     if user_variantfile is None:
         with open(variantbed, "w") as vb:
             for varianttuple in sorted(variants, key=lambda h: (h.chrom, h.start, h.end)):
@@ -65,7 +92,7 @@ def write_bedfiles(bamobj, refobj, queryobj, testmatbed, testpatbed, truthbed, v
             while variantline:
                 variantline = variantline.rstrip()
                 [chrom, start, end, name] = variantline.split("\t")
-                variants.append(bedinterval(chrom=chrom, start=str(start), end=str(end), name=name, rest=''))
+                variants.append(bedinterval(chrom=chrom, start=int(start), end=int(end), name=name, rest=''))
                 variantline = vh.readline()
 
     return [refcoveredbed, querycoveredbed, variants]
@@ -106,12 +133,32 @@ def retrieve_align_data(align, args)->list:
 
 # query start and query end are the lower and higher endpoints of the query seq in query coordinates (1-based)
 # regardless of orientation of the alignment
-def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, widen=True)->list:
+def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, chromhetsites:dict, hetsitealleles:dict, widen=True)->list:
 
-    #print("In align_variants with " + query + ":" + str(querystart) + "-" + str(queryend) + " " + ref + ":" + str(refstart) + "-" + str(refend) + "/" + strand)
+    print("In align_variants with " + query + ":" + str(querystart) + "-" + str(queryend) + " " + ref + ":" + str(refstart) + "-" + str(refend) + "/" + strand)
     variantlist = []
     coveredregionlist = []
     homozygousregionlist = []
+
+    if ref in chromhetsites:
+        desiredhets = chromhetsites[ref]
+        curhetindex = 0
+        curhetname = desiredhets[curhetindex].name
+        curhetstart = desiredhets[curhetindex].start
+        curhetend = desiredhets[curhetindex].end
+        while refstart > desiredhets[curhetindex].end and curhetindex < len(desiredhets) - 1:  # advance to next desired het
+            curhetindex = curhetindex + 1
+            curhetname = desiredhets[curhetindex].name
+            curhetstart = desiredhets[curhetindex].start
+            curhetend = desiredhets[curhetindex].end
+        numrefhets = len(desiredhets)
+        print(str(numrefhets) + " het sites in " + ref)
+    else:
+        desiredhets = []
+        [curhetindex, curhetname, curhetstart, curhetend] = [None, None, None, None]
+
+    [curhetallele, curhetquery, curhetquerystart, curhetqueryend] = [None, None, None, None]
+    numhetalleles = 0
 
     queryseq = queryobj.fetch(reference=query, start=querystart-1, end=queryend).upper()
     refseq = refobj.fetch(reference=ref, start=refstart-1, end=refend).upper()
@@ -143,16 +190,45 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             for blockoffset in range(oplength):
                 refpos = refcurrentoffset + blockoffset
                 querypos = querycurrentoffset + blockoffset
+                if strand == 'F':
+                    querycoordinate = querypos + querystart
+                else:
+                    querycoordinate = queryend - querypos
                 if refseq[refpos] != queryseq[querypos] and refseq[refpos] != "N" and queryseq[querypos] != "N":
-                    if strand == 'F':
-                        querycoordinate = querypos + querystart
-                    else:
-                        querycoordinate = queryend - querypos
                     variantname=query+"_"+str(querycoordinate)+"_"+refseq[refpos]+"_"+queryseq[querypos]+"_"+strand
                     additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart-1) + "\t" + str(refpos+refstart) + "\t0,0,0\t" + alignstring
                     variantlist.append(bedinterval(chrom=ref, start=refpos+refstart-1, end=refpos+refstart, name=variantname, rest=additionalfields))
 
-        if op in [2, 3]:
+                refabsposzb = refpos + refstart - 1
+                if curhetstart is not None and refabsposzb >= curhetstart and refabsposzb < curhetend: # het allele!
+                    if curhetallele is None:
+                        curhetallele = queryseq[querypos]
+                        curhetquery = query
+                        curhetquerystart = querycoordinate
+                        curhetqueryend = querycoordinate + 1
+                    else: # just an extension
+                        curhetallele = curhetallele + queryseq[querypos]
+                        curhetqueryend = querycoordinate + 1
+                elif curhetstart is not None and refabsposzb >= curhetstart and curhetstart == curhetend:
+                    curhetallele = ""
+                    curhetquery = query
+                    curhetquerystart = querycoordinate
+                    curhetqueryend = querycoordinate
+                if curhetend is not None and refabsposzb >= curhetend - 1:
+                    if curhetallele is not None: # print out current het allele info and reset everything
+                        if curhetallele == "":
+                            curhetallele = "*"
+                        hetsitealleles[curhetname] = {'name':curhetname, 'ref':ref, 'refstart':curhetstart, 'refend':curhetend, 'allele':curhetallele, 'query':curhetquery, 'start':curhetquerystart, 'end':curhetqueryend, 'chrom':curhetquery}
+                        #print("Found allele for " + curhetname + " " + str(curhetstart) + " " + str(curhetend) + " " + curhetallele + " index " + str(curhetindex) + " refpos zb " + str(refabsposzb))
+                        numhetalleles = numhetalleles + 1
+                        [curhetallele, curhetquery, curhetquerystart, curhetqueryend] = [None, None, None, None]
+                        [curhetname, curhetstart, curhetend] = [None, None, None]
+                        while curhetindex < len(desiredhets) - 1 and desiredhets[curhetindex].start <= refabsposzb:
+                            curhetindex = curhetindex + 1
+                            curhetname = desiredhets[curhetindex].name
+                            curhetstart = desiredhets[curhetindex].start
+                            curhetend = desiredhets[curhetindex].end
+        if op in [2, 3]: # deletions
             refallele = refseq[refcurrentoffset:refcurrentoffset+oplength]
             queryallele = "*"
             if widen is True:
@@ -175,7 +251,35 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+oplength+extend) + "\t0,0,0\t" + alignstring
                 variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+oplength+extend, name=variantname, rest=additionalfields ))
 
-        if op == 1:
+            refabsposzb = refpos + refstart
+            if curhetstart is not None and refabsposzb >= curhetstart and refabsposzb < curhetend: # het allele!
+                if curhetallele is None:
+                    curhetallele = ""
+                    curhetquery = query
+                    curhetquerystart = querycoordinate
+                    curhetqueryend = querycoordinate
+            if curhetend is not None and refabsposzb >= curhetend:
+                if curhetallele is not None: # print out current het allele info and reset everything
+                    if curhetallele == "":
+                        curhetallele = "*"
+                    hetsitealleles[curhetname] = {'name':curhetname, 'ref':ref, 'refstart':curhetstart, 'refend':curhetend, 'allele':curhetallele, 'query':curhetquery, 'start':curhetquerystart, 'end':curhetqueryend, 'chrom':curhetquery}
+                    #print("Found allele for " + curhetname + " " + str(curhetstart) + " " + str(curhetend) + " " + curhetallele + " index " + str(curhetindex))
+                    numhetalleles = numhetalleles + 1
+                    curhetallele = None
+                    curhetquery = None
+                    curhetquerystart = None
+                    curhetqueryend = None
+                    if curhetindex < len(desiredhets) - 1:
+                        curhetindex = curhetindex + 1
+                        curhetname = desiredhets[curhetindex].name
+                        curhetstart = desiredhets[curhetindex].start
+                        curhetend = desiredhets[curhetindex].end
+                    else:
+                        curhetname = None
+                        curhetstart = None
+                        curhetend = None
+
+        if op == 1: # insertion
             refallele = "*"
             queryallele = queryseq[querycurrentoffset:querycurrentoffset+oplength]
             if widen is True:
@@ -189,14 +293,26 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     extend = extend + 1
             if strand == 'F':
                 querycoordinate = querystart + querycurrentoffset
+                querycoordend = querycoordinate + oplength
             else:
                 querycoordinate = queryend - querycurrentoffset
+                querycoordend = querycoordinate - oplength
             
             if not (matchns.match(queryallele) or matchns.match(refallele)):
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
                 additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extend) + "\t0,0,0\t" + alignstring
                 variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+extend, name=variantname, rest=additionalfields ))
 
+            refabsposzb = refpos + refstart
+            if curhetstart is not None and refabsposzb >= curhetstart and refabsposzb < curhetend: # het allele!
+                if curhetallele is None:
+                    curhetallele = queryseq[querycurrentoffset:querycurrentoffset+oplength]
+                    curhetquery = query
+                    curhetquerystart = querycoordinate
+                    curhetqueryend = querycoordend
+                else: # just an extension
+                    curhetallele = curhetallele + queryseq[querycurrentoffset:querycurrentoffset+oplength]
+                    curhetqueryend = querycoordend
 
         # advance current positions: cases where reference coord advances (MDN=X):
         if op in [0, 2, 3, 7, 8]:
@@ -205,7 +321,55 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
         if op in [0, 1, 7, 8]:
             querycurrentoffset = querycurrentoffset + oplength
 
+        refabsposzb = refcurrentoffset + refstart - 1
+        
+        if curhetend is not None and refabsposzb > curhetend:
+            if curhetallele is not None: # print out current het allele info and reset everything
+                #print(curhetname + "\t" + curhetallele + "\t" + curhetquery + "\t" + str(curhetquerystart) + "\t" + str(curhetqueryend))
+                if curhetallele == "":
+                    curhetallele = "*"
+                hetsitealleles[curhetname] = {'name':curhetname, 'ref':ref, 'refstart':curhetstart, 'refend':curhetend, 'allele':curhetallele, 'query':curhetquery, 'start':curhetquerystart, 'end':curhetqueryend, 'chrom':curhetquery}
+                #print("Found allele for " + curhetname + " " + str(curhetstart) + " " + str(curhetend) + " " + curhetallele + " index " + str(curhetindex))
+                numhetalleles = numhetalleles + 1
+                curhetallele = None
+                curhetquery = None
+                curhetquerystart = None
+                curhetqueryend = None
+            else:
+                print("Unable to get allele for " + curhetname + " " + str(curhetstart) + " " + str(curhetend) + " at ref position " + str(refabsposzb))
+
+            while refabsposzb > desiredhets[curhetindex].end and curhetindex < len(desiredhets) - 1:  # advance to next desired het
+                curhetindex = curhetindex + 1
+                print("Unable to find allele for " + curhetname + " " + str(curhetstart) + " " + str(curhetend) + " at ref position " + str(refabsposzb))
+                curhetname = desiredhets[curhetindex].name
+                curhetstart = desiredhets[curhetindex].start
+                curhetend = desiredhets[curhetindex].end
+
+            if curhetindex == len(desiredhets) - 1:
+                print("At last desired het of " + str(curhetindex))
+                curhetname = None
+                curhetstart = None
+                curhetend = None
+    
         alignopindex = alignopindex + 1
 
+    print("Found " + str(numhetalleles) + " new het alleles")
     return variantlist
 
+def read_paf_aligns(paffile:str)->list:
+
+    alignlist = []
+    with open(paffile, "r") as pfh:
+        alignline = pfh.readline()
+        while alignline:
+            alignline = alignline.rstrip()
+            fields = alignline.split("\t")
+            if len(fields) >= 12:
+                [query, querylength, querystartzb, queryend, strand, target, targetlength, targetstartzb, targetend, resmatches, blocklength, mapqual] = fields[0:12]
+            else:
+                sys.print("Input paf-file has fewer than 12 tab-delimited columns. Unable to process.")
+                exit(1)
+            alignlist.append({'query':query, 'querylength':int(querylength), 'querystart':int(querystartzb)+1, 'queryend':int(queryend), 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':int(targetstartzb)+1, 'targetend':int(targetend)})
+            alignline = pfh.readline()
+
+    return alignlist
