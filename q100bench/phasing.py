@@ -28,10 +28,10 @@ def sort_chrom_hetsite_arrays(hetsites:dict):
 
     chromhetsites = {}
   
-    if hetsites.__class__==dict:
-        print("Hetsites is a dict!")
-    else:
-        print(str(hetsites.__class__), str(hetsites.__class__==dict))
+    #if hetsites.__class__==dict:
+        #print("Hetsites is a dict!")
+    #else:
+        #print(str(hetsites.__class__), str(hetsites.__class__==dict))
     for hetsite in hetsites.values():
         if hetsite.__class__==dict: #dict
             hetsitetype = 'dict'
@@ -74,7 +74,10 @@ def write_hetallele_bed(hetsitealleles:dict, hetbed:str):
                     allelehap = 'ALTHAP'
                 else:
                     allelehap = 'OTHER'
-                hfh.write(contig + "\t" + str(hetsite['start']) + "\t" + str(hetsite['end']) + "\t" + hetsite['name'] + "\t" + hetsite['allele'] + "\t" + hetsite['ref'] + "\t" + str(hetsite['refstart']) + "\t" + str(hetsite['refend']) + "\t" + allelehap + "\n")
+                assemblycontig = hetsite['query']
+                assemblystart = hetsite['start'] - 1
+                assemblyend = hetsite['end'] - 1
+                hfh.write(contig + "\t" + str(hetsite['start']) + "\t" + str(hetsite['end']) + "\t" + hetsite['name'] + "\t" + hetsite['allele'] + "\t" + hetsite['ref'] + "\t" + str(hetsite['refstart']) + "\t" + str(hetsite['refend']) + "\t" + assemblycontig + "\t" + str(assemblystart) + "\t" + str(assemblyend) + "\t" + allelehap + "\n")
             
 
 

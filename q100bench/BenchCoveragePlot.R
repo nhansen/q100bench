@@ -9,11 +9,11 @@ library(stringr)
 library(karyoploteR)
 args = commandArgs(trailingOnly=TRUE)
 
-genomename <- ifelse(!( is.na(args[1])), args[1], "test")
-benchname <- ifelse(!( is.na(args[2])), args[2], "truth")
+genomename <- ifelse(!( is.na(args[1])), args[1], "v0.8_mat")
+benchname <- ifelse(!( is.na(args[2])), args[2], "v1.0.1")
 outputdir <- ifelse(!( is.na(args[3])), args[3], "./")
 resourcedir <- ifelse(!( is.na(args[4])), args[4], "./")
-plottitle <- ifelse(!( is.na(args[5])), args[5], paste(c("Benchmark aligned coverage vs. ", genomename), sep="", collapse=""))
+plottitle <- ifelse(!( is.na(args[5])), args[5], paste(c(benchname, " aligned coverage vs. ", genomename), sep="", collapse=""))
 genomefile <- paste(c(resourcedir, "/v1.0.1.genome.bed"), sep="", collapse="")
 benchgenome <- toGRanges(genomefile)
 
@@ -32,13 +32,16 @@ pp <- getDefaultPlotParams(plot.type=1)
 pp$ideogramheight <- 100
 pp$topmargin <- 300
 
-plotname <- paste(c(outputdir, "/", genomename, ".benchcovered.truth.pdf"), sep="", collapse="")
+bordercol = 'black'
+borderlwd = 0.2
+plotname <- paste(c(outputdir, "/", genomename, ".benchcovered.v1.0.1.pdf"), sep="", collapse="")
 pdf(plotname, 8.5, 11.0)
 aligncolor <- ifelse(str_detect(benchcovereddf$V1, "MAT"), "green", "blue")
 kp <- plotKaryotype(genome=benchgenome, plot.type=1, chromosomes=chroms, main=plottitle, cex=0.5, plot.params=pp)
 kpAddBaseNumbers(kp, tick.dist = 20000000, tick.len = 10, cex=0.3)
-kpRect(kp, data=nlocranges, col="red", data.panel="ideogram", y0=rep(0, length(nlocranges)), y1=rep(1, length(nlocranges)))
-kpRect(kp, data=benchcoveredranges, col=aligncolor, data.panel="ideogram", y0=rep(0, length(benchcoveredranges)), y1=rep(1, length(benchcoveredranges)))
+kpRect(kp, data=benchcoveredranges, border=bordercol, lwd=borderlwd, col=aligncolor, data.panel="ideogram", y0=rep(0, length(benchcoveredranges)), y1=rep(1, length(benchcoveredranges)))
+
+kpRect(kp, data=nlocranges, border=bordercol, lwd=borderlwd, col="red", data.panel="ideogram", y0=rep(0, length(nlocranges)), y1=rep(1, length(nlocranges)))
 
 legend("bottomright", c("Maternal", "Paternal", "Ns"), fill=c("green", "blue", "red"))
 
