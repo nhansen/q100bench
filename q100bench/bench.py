@@ -118,7 +118,7 @@ def main() -> None:
     if args.bam:
         alignobj = pysam.AlignmentFile(args.bam, "rb")
     else:
-        pafaligns = alignparse.read_paf_aligns(args.paf)
+        pafaligns = alignparse.read_paf_aligns(args.paf, args.minalignlength)
 
     refobj = pysam.FastaFile(args.reffasta)
     queryobj = pysam.FastaFile(args.queryfasta)

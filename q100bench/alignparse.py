@@ -43,6 +43,7 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
             query = pafdict['query']
             querystart = pafdict['querystart']
             queryend = pafdict['queryend']
+            #print(query + ":" + str(querystart) + "-" + str(queryend))
             if querystart < queryend:
                 queryleft = querystart
                 queryright = queryend
@@ -54,10 +55,10 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
             refend = pafdict['targetend']
             strand = pafdict['strand']
 
-            querynamestring = query + "." + str(queryleft) + "." + str(queryright)
+            querynamestring = query + "." + str(querystart) + "." + str(queryend)
             refnamestring = ref + "." + str(refstart) + "." + str(refend) + "." + strand
             #print(querynamestring + ", " + refnamestring)
-            querycoveredstring += query + "\t" + str(querystart - 1) + "\t" + str(queryend) + "\t" + refnamestring + "\n"
+            querycoveredstring += query + "\t" + str(queryleft - 1) + "\t" + str(queryright) + "\t" + refnamestring + "\n"
             refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
 
     refcoveredbed = pybedtools.BedTool(refcoveredstring, from_string = True)
@@ -304,7 +305,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
 
     return variantlist
 
-def read_paf_aligns(paffile:str)->list:
+def read_paf_aligns(paffile:str, mintargetlength)->list:
 
     alignlist = []
     with open(paffile, "r") as pfh:
@@ -317,7 +318,12 @@ def read_paf_aligns(paffile:str)->list:
             else:
                 sys.print("Input paf-file has fewer than 12 tab-delimited columns. Unable to process.")
                 exit(1)
-            alignlist.append({'query':query, 'querylength':int(querylength), 'querystart':int(querystartzb)+1, 'queryend':int(queryend), 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':int(targetstartzb)+1, 'targetend':int(targetend)})
+            if int(targetend) - int(targetstartzb) >= mintargetlength:
+                print("Keeping paf entry " + target + ":" + targetstartzb + "-" + targetend)
+                if strand == "+":
+                    alignlist.append({'query':query, 'querylength':int(querylength), 'querystart':int(querystartzb)+1, 'queryend':int(queryend), 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':int(targetstartzb)+1, 'targetend':int(targetend)})
+                else:
+                    alignlist.append({'query':query, 'querylength':int(querylength), 'queryend':int(querystartzb)+1, 'querystart':int(queryend), 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':int(targetstartzb)+1, 'targetend':int(targetend)})
             alignline = pfh.readline()
 
     return alignlist
