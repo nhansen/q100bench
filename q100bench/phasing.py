@@ -19,6 +19,7 @@ def read_hetsites(hetsitefile)->dict:
             refallele = namefields[-3]
             altallele = namefields[-2]
             hetsitename = chrom + "_" + str(int(start) + 1) + "_" + refallele + "_" + altallele 
+            #print(hetsitename)
             hetsites[hetsitename] = bedinterval(chrom=chrom, start=int(start), end=int(end), name=name, rest='')
             hetsiteline = hfh.readline()
 

@@ -375,4 +375,38 @@ def write_het_stats(bedfiles:dict, args):
             altallele = namefields[-1]
             refallelelength = len(refallele) # these lengths are wrong when allele is "*"--should replace
             altallelelength = len(altallele) # these lengths are wrong when allele is "*"--should replace
+    return 0
+
+def write_read_error_summary(stats:dict, outputfiles:dict):
+    totalsnverrors = 0
+    totalindelerrors = 0
+    snvtypestring = ""
+    indellengthstring = ""
+    with open(outputfiles["errorstatsfile"], "w") as efh:
+        efh.write("Total aligned bases: " + str(stats["totalalignedbases"]) + "\n")
+        efh.write("Total clipped bases: " + str(stats["totalclippedbases"]) + "\n")
+        errorspermb = int(stats["totalerrorsinaligns"]/stats["totalalignedbases"]*1000000)
+        efh.write("Total errors in alignments: " + str(stats["totalerrorsinaligns"]) + " (" + str(errorspermb) + " error per megabase)" + "\n")
+        for errortype in stats["singlebasecounts"].keys():
+            typeerrors = stats["singlebasecounts"][errortype]
+            snvtypeerrorspermb = typeerrors/stats["totalalignedbases"]*1000000
+            snvtypestring = snvtypestring + errortype + "\t" + str(typeerrors) + "\t" + str(snvtypeerrorspermb) + "\n"
+            totalsnverrors = totalsnverrors + typeerrors
+        snverrorspermb = int(totalsnverrors/stats["totalalignedbases"]*1000000)
+        efh.write("Total substitution errors in alignments: " + str(totalsnverrors) + " (" + str(snverrorspermb) + " error per megabase)" + "\n")
+        for indellength in sorted(stats["indellengthcounts"].keys()):
+            indelcount = stats["indellengthcounts"][indellength]
+            indelerrorspermb = indelcount/stats["totalalignedbases"]*1000000
+            indellengthstring = indellengthstring + str(indellength) + "\t" + str(indelcount) + "\t" + str(indelerrorspermb) + "\n"
+            totalindelerrors = totalindelerrors + indelcount
+        indelerrorspermb = int(totalindelerrors/stats["totalalignedbases"]*1000000)
+        efh.write("Total indel errors in alignments: " + str(totalindelerrors) + " (" + str(indelerrorspermb) + " error per megabase)" + "\n")
+
+    with open(outputfiles["snvstatsfile"], "w") as sfh:
+        sfh.write(snvtypestring)
+
+    with open(outputfiles["indelstatsfile"], "w") as ifh:
+        ifh.write(indellengthstring)
+
+    return 0
 

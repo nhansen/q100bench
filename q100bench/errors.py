@@ -1,6 +1,8 @@
 import re
 import sys
+import random
 from collections import namedtuple
+from q100bench import alignparse
 
 # create namedtuple for bed intervals:
 bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
@@ -85,3 +87,215 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
 
     return result
 
+def assess_mononuc_read_coverage(align_obj, region:str, mononucbedfile:str, mononucstatsfile:str, hetsitedict):
+
+    p = {}
+    p["A"] = re.compile("^[aA]+$")
+    p["T"] = re.compile("^[tT]+$")
+    p["C"] = re.compile("^[cC]+$")
+    p["G"] = re.compile("^[gG]+$")
+  
+    mononucdict = {}
+    msfh = open(mononucstatsfile, "w", buffering=1)
+    with open(mononucbedfile, "r") as mfh:
+        mononucline = mfh.readline()
+        while mononucline:
+            mononucline = mononucline.rstrip()
+            [chrom, start, end, name, score, strand, widestart, wideend, color] = mononucline.split("\t")
+            runlength = int(end) - int(start)
+            namefields = name.split("_")
+            repeatedbase = namefields[-1]
+            refalleleseq = repeatedbase * runlength
+            #print(chrom + ":" + str(start) + "-" + str(end) + " " + repeatedbase + "\t" + str(runlength))
+            for readalign in align_obj.fetch(contig=chrom, start=int(start), stop=int(end)):
+                pairs = readalign.get_aligned_pairs()
+                readname = readalign.query_name
+                if len(pairs) == 0:
+                    continue
+                readstart = find_readpos_in_pairs(pairs, int(start)-1)
+                readend = find_readpos_in_pairs(pairs, int(end)+1)
+                if readstart is not None and readend is not None:
+                    queryseq = readalign.query_sequence
+                    if readalign.is_secondary or queryseq is None:
+                        continue
+                    queryseq = queryseq.upper()
+                    alleleseq = queryseq[readstart:readend]
+                    alleleseq = alleleseq[1:-1]
+                    if p[repeatedbase].match(alleleseq):
+                        numbases = len(alleleseq)
+                        type = "CORRECT"
+                        if numbases != runlength:
+                            potentialhetname = chrom + "_" + str(int(start)+1) + "_" + refalleleseq + "_" + alleleseq
+                            if potentialhetname in hetsitedict:
+                                type = "HET"
+                            else:
+                                type = "ERROR"
+                        msfh.write(chrom + "\t" + str(start) + "\t" + str(end) + "\t" + readname + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(numbases) + "\t" + type + "\n")
+                    else:
+                        msfh.write(chrom + "\t" + str(start) + "\t" + str(end) + "\t" + readname + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + "COMPLEX" + "\t" + type + "\n")
+                else:
+                    print(readname + " is unaligned at one endpoint!")
+
+            mononucline = mfh.readline()
+
+    return 0
+
+def find_readpos_in_pairs(pairs, pos):
+    alignlength = len(pairs)
+    low = 0
+    high = alignlength - 1
+
+    hiref = pairs[high][1]
+    while hiref is None and high > 0:
+        high = high - 1
+        hiref = pairs[high][1]
+    lowref = pairs[low][1]
+    while lowref is None and low < len(pairs):
+        low = low + 1
+        lowref = pairs[low][1]
+
+    if lowref is None or hiref is None or lowref > pos or hiref < pos:
+        return None
+
+    while high > low and hiref >= pos and lowref <= pos:
+        mid = int((low + high)/2)
+        if random.random() >= 0.5:
+            mid = mid + 1
+        himid = mid
+        lowmid = mid
+        while himid < high and pairs[himid][1] is None:
+            himid = himid + 1
+        while lowmid > low and pairs[lowmid][1] is None:
+            lowmid = lowmid - 1
+        if pairs[lowmid][1] is None or pairs[himid][1] is None:
+            return None
+        if abs(pairs[lowmid][1] - pos) < abs(pairs[himid][1] - pos):
+            mid = lowmid
+        else:
+            mid = himid
+        midval = pairs[mid][1]
+        #print(str(low) + " " + str(high) + " " + str(midval) + " " + str(pos) + " " + str(pairs[low][1]) + " " + str(pairs[high][1]) + " " + str(len(pairs)))
+        if midval == pos:
+            return pairs[mid][0] # might be None if nothing is aligned here
+        elif midval > pos:
+            high = mid
+        elif midval < pos:
+            low = mid
+        if (pairs[low][1] is not None and pairs[low][1] > pos) or (pairs[high][1] is not None and pairs[high][1] < pos):
+            return None
+
+    return None
+
+def assess_read_align_errors(align_obj, refobj, readerrorfile:str, hetsitedict, args):
+   
+    if not args.errorfile:
+        refh = open(readerrorfile, "w")
+
+    stats = {}
+    stats["totalalignedbases"] = 0
+    stats["totalclippedbases"] = 0
+    stats["totalerrorsinaligns"] = 0
+    stats["singlebasecounts"] = {}
+    stats["indellengthcounts"] = {}
+    alignsprocessed = 0
+    for align in align_obj.fetch():
+        if align.is_secondary or align.cigartuples is None:
+            continue
+
+        stats["totalalignedbases"] = stats["totalalignedbases"] + align.query_alignment_length
+        cigartuples = align.cigartuples
+        if cigartuples[0][0] in [4, 5]:
+            stats["totalclippedbases"] = stats["totalclippedbases"] + cigartuples[0][1]
+        if cigartuples[-1][0] in [4, 5]:
+            stats["totalclippedbases"] = stats["totalclippedbases"] + cigartuples[-1][1]
+        
+        if not args.errorfile:
+            query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align, args)
+            if strand == "F":
+                queryleft = querystart
+                queryright = queryend
+            else:
+                queryleft = queryend
+                queryright = querystart
+
+            hetsites = {}
+            hetsitealleles = {} # no need to track het site alleles in this context
+            queryobj = None
+
+            read_variants = alignparse.align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, True)
+
+            for variant in read_variants:
+                namefields = variant.name.split("_")
+                pos = int(namefields[-4])
+                refallele = namefields[-3]
+                altallele = namefields[-2]
+                if namefields[-1] == "F":
+                    alignstrand = '+'
+                else:
+                    alignstrand = '-'
+                varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
+    
+                if varname in hetsitedict.keys():
+                    errortype = 'HET'
+                    errortypecolor = '255,0,0'
+                else:
+                    errortype = 'ERROR'
+                    errortypecolor = '0,0,255'
+
+                # record error in stats:
+                if errortype == 'ERROR':
+                    stats["totalerrorsinaligns"] = stats["totalerrorsinaligns"] + 1
+                    if refallele != "*" and altallele != "*" and len(refallele) == 1 and len(altallele) == 1:
+                        snvkey = refallele + "_" + altallele
+                        if snvkey in stats["singlebasecounts"]:
+                            stats["singlebasecounts"][snvkey] = stats["singlebasecounts"][snvkey] + 1
+                        else:
+                            stats["singlebasecounts"][snvkey] = 1
+                    else:
+                        trueref = refallele.replace('*', '')
+                        truealt = altallele.replace('*', '')
+                        lengthdiff = len(truealt) - len(trueref)
+                        if lengthdiff in stats["indellengthcounts"]:
+                            stats["indellengthcounts"][lengthdiff] = stats["indellengthcounts"][lengthdiff] + 1
+                        else:
+                            stats["indellengthcounts"][lengthdiff] = 1
+
+                refh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.name + "\n")
+
+        alignsprocessed = alignsprocessed + 1
+        if alignsprocessed == 100000*int(alignsprocessed/100000):
+            print("Processed " + str(alignsprocessed) + " aligns")
+
+    if args.errorfile:
+        with open(args.errorfile, "r") as efh:
+            errorline = efh.readline()
+            while errorline:
+                errorline = errorline.rstrip()
+                [chrom, start, end, varname, score, strand, widestart, wideend, color, variant_type, queryvariantname] = errorline.split("\t")
+                if variant_type == "HET":
+                    errorline = efh.readline()
+                    continue
+
+                namefields = varname.split("_")
+                refallele = namefields[-2]
+                altallele = namefields[-1]
+                
+                # record error in stats:
+                stats["totalerrorsinaligns"] = stats["totalerrorsinaligns"] + 1
+                if refallele != "*" and altallele != "*" and len(refallele) == 1 and len(altallele) == 1:
+                    snvkey = refallele + "_" + altallele
+                    if snvkey in stats["singlebasecounts"]:
+                        stats["singlebasecounts"][snvkey] = stats["singlebasecounts"][snvkey] + 1
+                    else:
+                        stats["singlebasecounts"][snvkey] = 1
+                else:
+                    trueref = refallele.replace('*', '')
+                    truealt = altallele.replace('*', '')
+                    lengthdiff = len(truealt) - len(trueref)
+                    if lengthdiff in stats["indellengthcounts"]:
+                        stats["indellengthcounts"][lengthdiff] = stats["indellengthcounts"][lengthdiff] + 1
+                    else:
+                        stats["indellengthcounts"][lengthdiff] = 1
+                errorline = efh.readline()
+
+    return stats

@@ -33,3 +33,13 @@ def name_output_files(args, outputdir:str)->dict:
     files["coveredhetsitealleles"] = outputdir + "/" + args.assembly + ".coveredhetalleles." + args.benchmark + ".bed"
 
     return files
+
+def name_read_stats_files(args, outputdir:str)->dict:
+    files = {}
+    files["mononucstatsfile"] = outputdir + "/" + args.readsetname + ".mononucstats.txt"
+    files["readerrorfile"] = outputdir + "/" + args.readsetname + ".readerrors.txt"
+    files["errorstatsfile"] = outputdir + "/" + args.readsetname + ".generalstats.txt"
+    files["snvstatsfile"] = outputdir + "/" + args.readsetname + ".singlenucerrorstats.txt"
+    files["indelstatsfile"] = outputdir + "/" + args.readsetname + ".indelerrorstats.txt"
+
+    return files

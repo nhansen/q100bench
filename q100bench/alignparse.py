@@ -32,11 +32,10 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
                     queryright = querystart
                 querynamestring = query + "." + str(queryleft) + "." + str(queryright)
                 refnamestring = ref + "." + str(refstart) + "." + str(refend) + "." + strand
-                #print(querynamestring + ", " + refnamestring)
                 querycoveredstring += query + "\t" + str(querystart - 1) + "\t" + str(queryend) + "\t" + refnamestring + "\n"
                 refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
                 if user_variantfile is None:
-                    variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles))
+                    variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, True))
     else:
         for pafdict in pafaligns:
             # all start/endpoints are 1-based
@@ -148,14 +147,19 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
     # make an array of query positions for each ref position:
     query_positions = []
 
-    queryseq = queryobj.fetch(reference=query, start=querystart-1, end=queryend).upper()
+    if queryobj is None:
+        queryseq = align.query_alignment_sequence
+    else:
+        queryseq = queryobj.fetch(reference=query, start=querystart-1, end=queryend).upper()
+
     refseq = refobj.fetch(reference=ref, start=refstart-1, end=refend).upper()
 
     alignstring = ref + ":" + str(refstart-1) + "-" + str(refend) + ";" + query + ":" + str(querystart-1) + "-" + str(queryend)
     strandsign = 1
     bedstrand = '+'
     if strand == 'R':
-        queryseq = seqparse.revcomp(queryseq)
+        if queryobj is not None:
+            queryseq = seqparse.revcomp(queryseq)
         strandsign = -1
         bedstrand = '-'
 
@@ -190,6 +194,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 query_positions.append(querypos)
 
         if op in [2, 3]: # deletions
+            refpos = refcurrentoffset-1;
             for deloffset in range(oplength):
                 query_positions.append(querycurrentoffset)
             refallele = refseq[refcurrentoffset:refcurrentoffset+oplength] # one-based refstart+refcurrentoffset to refstart+refcurrentoffset+oplength-1
@@ -222,6 +227,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+oplength+extend, name=variantname, rest=additionalfields ))
 
         if op == 1: # insertion
+            refpos = refcurrentoffset-1;
             refallele = "*"
             queryallele = queryseq[querycurrentoffset:querycurrentoffset+oplength] # one-based querystart+querycurrentoffset to querystart+querycurrentoffset+oplength-1 if forward strand, queryend-querycurrentoffset to queryend-querycurrentoffset-oplength+1 if reverse
             #query_positions.append(querycurrentoffset)
