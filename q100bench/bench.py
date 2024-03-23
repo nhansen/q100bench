@@ -15,6 +15,7 @@ from q100bench import seqparse
 from q100bench import alignparse
 from q100bench import phasing
 from q100bench import stats
+from q100bench import mummermethods
 from q100bench import plots
 
 # create namedtuple for bed intervals:
@@ -117,8 +118,13 @@ def main() -> None:
     pafaligns = None
     if args.bam:
         alignobj = pysam.AlignmentFile(args.bam, "rb")
+        #bamaligns = alignparse.read_bam_aligns(alignobj, args.minalignlength)
+        #qlis_aligns = mummermethods.filter_aligns(bamaligns, "query")
+        #rlis_aligns = mummermethods.filter_aligns(bamaligns, "target")
     else:
         pafaligns = alignparse.read_paf_aligns(args.paf, args.minalignlength)
+        #qlis_aligns = mummermethods.filter_aligns(pafaligns, "query")
+        #rlis_aligns = mummermethods.filter_aligns(pafaligns, "target")
 
     refobj = pysam.FastaFile(args.reffasta)
     queryobj = pysam.FastaFile(args.queryfasta)
@@ -133,7 +139,7 @@ def main() -> None:
     benchmark_stats = stats.write_general_assembly_stats(outputfiles["generalstatsfile"], refobj, queryobj, testcontigbed, testgapbed, args)
 
     print("Writing bed files of regions covered by alignments of " + args.assembly + " to " + args.benchmark)
-    [refcoveredbed, querycoveredbed, variants] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["variantbed"], outputfiles["coveredhetsitealleles"], args)
+    [refcoveredbed, querycoveredbed, variants, hetsitealleles] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["variantbed"], outputfiles["coveredhetsitealleles"], args)
 
     # create merged unique outputfiles:
     [mergedtruthcoveredbed, outputfiles["mergedtruthcovered"]] = bedtoolslib.mergebed(outputfiles["truthcovered"])
@@ -141,14 +147,16 @@ def main() -> None:
     [mergedtestpatcoveredbed, outputfiles["mergedtestpatcovered"]] = bedtoolslib.mergebed(outputfiles["testpatcovered"])
 
     print("Writing primary alignment statistics about " + args.assembly + " assembly")
-    benchmark_stats = stats.write_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
+    benchmark_stats = stats.write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
+    #benchmark_stats = stats.write_aligned_stats(refobj, queryobj, refcoveredbed, querycoveredbed, outputfiles, benchmark_stats, args)
 
     if alignobj is not None:
         # classify variant errors as phasing or novel errors:
+        print("Writing phase switch statistics")
+        stats.write_het_stats(outputfiles, benchmark_stats, args)
         print("Determining whether errors are switched haplotype or novel")
-        #stats.write_het_stats(outputfiles, args)
-        variantfile = errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, args)
-        stats.write_qv_stats(benchmark_stats, variantfile, outputfiles, args)
+        benchmark_stats = errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, benchmark_stats, args)
+        stats.write_qv_stats(benchmark_stats, outputfiles, args)
 
         # measure het phasing across chromosomes:
         #print("Evaluating phasing of heterozygous sites across chromosomes")

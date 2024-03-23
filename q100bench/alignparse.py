@@ -23,7 +23,7 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
             if align.is_secondary:
                 continue
             if align.reference_length >= args.minalignlength:
-                query, querystart, queryend, ref, refstart, refend, strand = retrieve_align_data(align, args)
+                query, querystart, queryend, ref, refstart, refend, strand = retrieve_align_data(align)
                 if strand == "F":
                     queryleft = querystart
                     queryright = queryend
@@ -66,18 +66,18 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
     phap1 = re.compile(r'.*MAT.*')
     phap2 = re.compile(r'.*PAT.*')
     with open(testmatbed, "w") as tmb:
-        for testtuple in sorted(querycoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
-            if phap1.match(testtuple.name):
-                tmb.write(testtuple.chrom + "\t" + str(testtuple.start) + "\t" + str(testtuple.end) + "\t" + testtuple.name + "\n")
+        for testint in sorted(querycoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
+            if phap1.match(testint.name):
+                tmb.write(testint.chrom + "\t" + str(testint.start) + "\t" + str(testint.end) + "\t" + testint.name + "\n")
 
     with open(testpatbed, "w") as tpb:
-        for testtuple in sorted(querycoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
-            if phap2.match(testtuple.name):
-                tpb.write(testtuple.chrom + "\t" + str(testtuple.start) + "\t" + str(testtuple.end) + "\t" + testtuple.name + "\n")
+        for testint in sorted(querycoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
+            if phap2.match(testint.name):
+                tpb.write(testint.chrom + "\t" + str(testint.start) + "\t" + str(testint.end) + "\t" + testint.name + "\n")
 
     with open(truthbed, "w") as rb:
-        for truthtuple in sorted(refcoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
-            rb.write(truthtuple.chrom + "\t" + str(truthtuple.start) + "\t" + str(truthtuple.end) + "\t" + truthtuple.name + "\n")
+        for truthint in sorted(refcoveredbed, key=lambda h: (h.chrom, h.start, h.stop)):
+            rb.write(truthint.chrom + "\t" + str(truthint.start) + "\t" + str(truthint.end) + "\t" + truthint.name + "\n")
 
     phasing.write_hetallele_bed(hetsitealleles, hetallelebed)
 
@@ -95,9 +95,9 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
                 variants.append(bedinterval(chrom=chrom, start=int(start), end=int(end), name=name, rest=''))
                 variantline = vh.readline()
 
-    return [refcoveredbed, querycoveredbed, variants]
+    return [refcoveredbed, querycoveredbed, variants, hetsitealleles]
 
-def retrieve_align_data(align, args)->list:
+def retrieve_align_data(align)->list:
     if align.is_reverse:
         strand = 'R'
     else:
@@ -170,8 +170,8 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
     querycurrentoffset = 0
 
     alignopindex = 0
-    reflength = refend - refstart + 1
-    querylength = queryend - querystart + 1
+    refalignlength = refend - refstart + 1
+    queryalignlength = queryend - querystart + 1
     matchns = re.compile(".*[nN].*")
 
     while refcurrentoffset <= refend-refstart and alignopindex < len(alignops): # traverse the alignment operator by operator
@@ -201,7 +201,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             queryallele = "*" # one-based between querystart+querycurrentoffset-1 and querystart+querycurrentoffset if forward strand, queryend-querycurrentoffset+1 and queryend-querycurrentoffset if rev
             if widen is True: # n.b. - this will *lower* the righthand coordinate of reverse strand queries by "extend"
                 extend = 0
-                while querycurrentoffset + extend < querylength and refcurrentoffset + extend < reflength and refseq[refcurrentoffset + extend] == queryseq[querycurrentoffset + extend]:
+                while querycurrentoffset + extend < queryalignlength and refcurrentoffset + extend < refalignlength and refseq[refcurrentoffset + extend] == queryseq[querycurrentoffset + extend]:
                     refallele = refallele + queryseq[querycurrentoffset + extend]
                     if queryallele == "*":
                         queryallele = queryseq[querycurrentoffset + extend]
@@ -217,7 +217,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             [queryleftbase, queryrightbase] = ["", ""]
             if querycurrentoffset > 0:
                 queryleftbase = queryseq[querycurrentoffset-1]
-            if querycurrentoffset+extend < querylength:
+            if querycurrentoffset+extend < queryalignlength:
                 queryrightbase = queryseq[querycurrentoffset+extend]
             querysurroundingseq = queryleftbase + queryrightbase
         
@@ -233,7 +233,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             #query_positions.append(querycurrentoffset)
             if widen is True: # n.b. - this will *lower* the righthand coordinate of reverse strand queries by "extend"
                 extend = 0
-                while querycurrentoffset + extend < querylength and refcurrentoffset + extend < reflength and refseq[refcurrentoffset + extend] == queryseq[querycurrentoffset + extend]:
+                while querycurrentoffset + extend < queryalignlength and refcurrentoffset + extend < refalignlength and refseq[refcurrentoffset + extend] == queryseq[querycurrentoffset + extend]:
                     queryallele = queryallele + refseq[refcurrentoffset + extend]
                     if refallele == "*":
                         refallele = refseq[refcurrentoffset + extend]
@@ -251,7 +251,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             [refleftbase, refrightbase] = ["", ""]
             if refcurrentoffset > 0:
                 refleftbase = refseq[refcurrentoffset-1]
-            if refcurrentoffset+extend+1 < reflength:
+            if refcurrentoffset+extend+1 < refalignlength:
                 refrightbase = refseq[refcurrentoffset+extend+1]
             refsurroundingseq = refleftbase + refrightbase
             
@@ -307,11 +307,10 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             queryendcoord = querystart + queryendoffset - 2
 
             hetsitealleles[hetname] = {'name':hetname, 'ref':ref, 'refstart':hetstart, 'refend':hetend, 'allele':queryallele, 'query':query, 'start':querystartcoord, 'end':queryendcoord, 'chrom':query}
-            #print(hetname + "\t" + ref + "\t" + str(hetstart) + "\t" + str(hetend) + "\t" + query + "\t" + str(querystartcoord) + "\t" + str(queryendcoord) + "\t" + queryallele + "\t" + alleletype)
 
     return variantlist
 
-def read_paf_aligns(paffile:str, mintargetlength)->list:
+def read_paf_aligns(paffile:str, mintargetlength=0)->list:
 
     alignlist = []
     with open(paffile, "r") as pfh:
@@ -333,3 +332,32 @@ def read_paf_aligns(paffile:str, mintargetlength)->list:
             alignline = pfh.readline()
 
     return alignlist
+
+def read_bam_aligns(bamobj, mintargetlength=0)->list:
+
+    alignlist = []
+
+    refentries = bamobj.references
+    reflengths = bamobj.lengths
+    reflengthdict = {}
+    for tid in range(len(refentries)):
+        reflengthdict[refentries[tid]] = reflengths[tid]
+
+    for align in bamobj.fetch():
+        if align.is_secondary:
+            continue
+        if align.reference_length >= mintargetlength:
+            query, querystart, queryend, ref, refstart, refend, strand = retrieve_align_data(align)
+            querylength = align.query_length
+            targetlength = reflengthdict[ref]
+            if strand == "F":
+                queryleft = querystart
+                queryright = queryend
+                alignlist.append({'query':query, 'querylength':querylength, 'querystart':querystart, 'queryend':queryend, 'strand':'+', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend})
+            else:
+                queryleft = queryend
+                queryright = querystart
+                alignlist.append({'query':query, 'querylength':querylength, 'queryend':queryend, 'querystart':querystart, 'strand':'-', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend})
+
+    return alignlist
+

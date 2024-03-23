@@ -29,10 +29,6 @@ def sort_chrom_hetsite_arrays(hetsites:dict):
 
     chromhetsites = {}
   
-    #if hetsites.__class__==dict:
-        #print("Hetsites is a dict!")
-    #else:
-        #print(str(hetsites.__class__), str(hetsites.__class__==dict))
     for hetsite in hetsites.values():
         if hetsite.__class__==dict: #dict
             hetsitetype = 'dict'
@@ -61,8 +57,6 @@ def write_hetallele_bed(hetsitealleles:dict, hetbed:str):
     print("Opening " + hetbed + " to write het alleles along assembly contigs")
     with open(hetbed, "w") as hfh:
         for contig in sorted(contigsortedhetalleles.keys()):
-            numhets = len(contigsortedhetalleles)
-            print("Processing " + str(numhets) + " hets for chrom " + contig)
             for hetsite in contigsortedhetalleles[contig]:
                 hetname = hetsite['name']
                 fields = hetname.split("_")

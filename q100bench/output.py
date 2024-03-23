@@ -30,7 +30,9 @@ def name_output_files(args, outputdir:str)->dict:
     files["mononucswithvariantsfile"] = outputdir + "/" + args.assembly + ".mononucswithvariants." + args.benchmark + ".bed"
     files["bencherrortypebed"] = outputdir + "/" + args.assembly + ".errortype." + args.benchmark + ".bed"
     files["testerrortypebed"] = outputdir + "/errortype." + args.assembly + ".bed"
-    files["coveredhetsitealleles"] = outputdir + "/" + args.assembly + ".coveredhetalleles." + args.benchmark + ".bed"
+    files["coveredhetsitealleles"] = outputdir + "/" + args.benchmark + ".coveredhetalleles." + args.assembly + ".bed"
+    files["snvstatsfile"] = outputdir + "/" + args.assembly + ".singlenucerrorstats.txt"
+    files["indelstatsfile"] = outputdir + "/" + args.assembly + ".indelerrorstats.txt"
 
     return files
 
