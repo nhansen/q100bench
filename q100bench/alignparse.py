@@ -459,7 +459,7 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles
         if lca95 is not None:
             print(str(lca95) + " clusters of alignments cover " + str(totalnonexcludedcovered) + " out of " + str(refnelength) + " non-excluded bases on entry " + refentry + " with NCA95 " + str(nca95))
         else:
-            print("Not enough aligned query sequence to cover 95% of " + str(refnelength) + " bases on entry " + refentry)
+            print("Not enough aligned query sequence to cover 95% of " + str(refnelength) + " non-excluded bases on entry " + refentry)
         
 
 def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):

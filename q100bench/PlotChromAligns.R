@@ -104,7 +104,7 @@ plotaligns <- function(aligns, index=1, suppressaxis=FALSE, suppresstitle=FALSE,
 }
 
 
-multiplotaligns <- function(aligns, chromlength=NA) {
+multiplotaligns <- function(aligns, chromlength=NA, chromplotfile=NA) {
   querydf <- data.frame(query=unique(aligns[!str_detect(aligns$cluster, "Small"), "query"]))
   querydf$basescovered <-sapply(querydf$query, function(x) {querycoverage(aligns, x)})
 
@@ -113,6 +113,10 @@ multiplotaligns <- function(aligns, chromlength=NA) {
 
   if (coveredbases < halfchromlength) {
     return(0)
+  }
+
+  if (!is.na(chromplotfile)) {
+    pdf(chromplotfile, 8.5, 11.0)
   }
 
   par(pardefault)
@@ -144,8 +148,11 @@ multiplotaligns <- function(aligns, chromlength=NA) {
     }
     par(mar=c(5,4,0,1))
     plotaligns(aligns, numplots, suppressaxis=FALSE, suppresstitle=TRUE)
-    return(plotheights)
   }
+  if (!is.na(chromplotfile)) {
+    dev.off()
+  }
+
 }
 
 querycoverage <- function(aligns, queryname) {
@@ -158,6 +165,4 @@ querycoverage <- function(aligns, queryname) {
 aligns <- readaligns(chromfile)
 chromplotfile <- chromfile
 chromplotfile <- sub(".bed", ".pdf", chromplotfile)
-pdf(chromplotfile, 8.5, 11.0)
-multiplotaligns(aligns, chromlength=chromlength)
-dev.off()
+multiplotaligns(aligns, chromlength=chromlength, chromplotfile)
