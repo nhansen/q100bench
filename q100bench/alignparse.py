@@ -4,6 +4,8 @@ import pybedtools
 from collections import namedtuple
 from q100bench import seqparse
 from q100bench import phasing
+from q100bench import bedtoolslib
+from q100bench import output
 
 # create namedtuple for bed intervals:
 bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
@@ -323,12 +325,20 @@ def read_paf_aligns(paffile:str, mintargetlength=0)->list:
             else:
                 sys.print("Input paf-file has fewer than 12 tab-delimited columns. Unable to process.")
                 exit(1)
-            if int(targetend) - int(targetstartzb) >= mintargetlength:
-                print("Keeping paf entry " + target + ":" + targetstartzb + "-" + targetend)
+
+            querystart = int(querystartzb) + 1
+            queryend = int(queryend)
+            queryalignlength = queryend - int(querystartzb)
+            targetstart = int(targetstartzb) + 1
+            targetend = int(targetend)
+            targetalignlength = targetend - int(targetstartzb)
+
+            if targetalignlength >= mintargetlength:
+                #print("Keeping paf entry " + target + ":" + targetstartzb + "-" + str(targetend))
                 if strand == "+":
-                    alignlist.append({'query':query, 'querylength':int(querylength), 'querystart':int(querystartzb)+1, 'queryend':int(queryend), 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':int(targetstartzb)+1, 'targetend':int(targetend)})
+                    alignlist.append({'query':query, 'querylength':int(querylength), 'querystart':querystart, 'queryend':queryend, 'queryalignlength':queryalignlength, 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':targetstart, 'targetend':targetend, 'targetalignlength':targetalignlength})
                 else:
-                    alignlist.append({'query':query, 'querylength':int(querylength), 'queryend':int(querystartzb)+1, 'querystart':int(queryend), 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':int(targetstartzb)+1, 'targetend':int(targetend)})
+                    alignlist.append({'query':query, 'querylength':int(querylength), 'queryend':querystart, 'querystart':queryend, 'queryalignlength':queryalignlength, 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':targetstart, 'targetend':targetend, 'targetalignlength':targetalignlength})
             alignline = pfh.readline()
 
     return alignlist
@@ -353,11 +363,155 @@ def read_bam_aligns(bamobj, mintargetlength=0)->list:
             if strand == "F":
                 queryleft = querystart
                 queryright = queryend
-                alignlist.append({'query':query, 'querylength':querylength, 'querystart':querystart, 'queryend':queryend, 'strand':'+', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend})
+                alignlist.append({'query':query, 'querylength':querylength, 'querystart':querystart, 'queryend':queryend, 'queryalignlength':queryend-querystart+1, 'strand':'+', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend, 'targetalignlength':refend-refstart+1})
             else:
                 queryleft = queryend
                 queryright = querystart
-                alignlist.append({'query':query, 'querylength':querylength, 'queryend':queryend, 'querystart':querystart, 'strand':'-', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend})
+                alignlist.append({'query':query, 'querylength':querylength, 'queryend':queryend, 'querystart':querystart, 'queryalignlength':queryend-querystart+1, 'strand':'-', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend, 'targetalignlength':refend-refstart+1})
 
     return alignlist
+
+def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles, bedobjects):
+
+    # maximum separating distance along target to include in one cluster of alignments
+    maxdistance = args.maxclusterdistance
+
+    # create a directory for alignment line plots for each chromosome:
+    output.create_output_directory(outputfiles["alignplotdir"])
+    alignplotprefix = outputfiles["alignplotprefix"]
+
+    # ref nonexcluded dict:
+    refnonexcludedlength = {}
+    for ref in refobj.references:
+        refnonexcludedlength[ref] = refobj.get_reference_length(ref)
+
+    for interval in bedobjects["allexcludedregions"]:
+        ref = interval.chrom
+        refnonexcludedlength[ref] = refnonexcludedlength[ref] - len(interval)
+
+    aligndict = {}
+    for align in aligndata:
+        refentry = align["target"]
+        if refentry not in aligndict:
+            aligndict[refentry] = [align]
+        else:
+            aligndict[refentry].append(align)
+
+    # assess each benchmark entry, one by one
+    for refentry in sorted(aligndict.keys()):
+        refnelength = refnonexcludedlength[refentry]
+        refalignclusters = []
+        # sort alignments from longest (along the benchmark) to shortest:
+        aligndict[refentry].sort(reverse=True, key=lambda align: align["targetalignlength"])
+        # calculate slope as query diff over ref diff, and cluster alignments within the same query/target band:
+        for refalign in aligndict[refentry]:
+            alignrefstart = refalign['targetstart']
+            alignrefend = refalign['targetend']
+            alignquery = refalign['query']
+            alignquerystart = refalign['querystart']
+            alignqueryend = refalign['queryend']
+            refalignclusters = add_align_to_clusters(refalign, refalignclusters, maxdistance)
+
+        # split clusters that are separated along the target by more than maxdistance:
+        refalignclusters = split_disjoint_clusters(refalignclusters, maxdistance)
+
+        for cluster in sorted(refalignclusters, key=lambda c: c["aligns"][0]["targetstart"]):
+            clusterquery = cluster["query"] 
+            clusterslope = cluster["slope"]
+            clusterintercept = cluster["intercept"]
+            clusterbedstring = ""
+            for align in sorted(cluster["aligns"], key=lambda a: (a["targetstart"], a["targetend"])):
+                clusterbedstring = clusterbedstring + refentry + "\t" + str(align["targetstart"]) + "\t" + str(align["targetend"]) + "\t" + clusterquery + "_" + str(align["querystart"]) + "_" + str(align["queryend"]) + "\n"
+
+            bedtool = pybedtools.BedTool(clusterbedstring, from_string = True)
+            nonexcludedbedtool = bedtoolslib.intersectintervals(bedtool, bedobjects["allexcludedregions"], v=True)
+            cluster["nonexcludedcoveredbases"] = bedtoolslib.bedsum(nonexcludedbedtool)
+            mergednonexcludedbedtool = bedtoolslib.mergeintervals(nonexcludedbedtool)
+            cluster["nrnonexcludedcoveredbases"] = bedtoolslib.bedsum(mergednonexcludedbedtool)
+
+        # calculate how many clusters needed to cover 95% of ref:
+        totalnonexcludedcovered = 0
+        clustercount = 0
+        lca95 = None
+        nca95 = None
+        clusterno = 1
+        refentrybedstring = ""
+        for cluster in sorted(refalignclusters, key=lambda c:c["nrnonexcludedcoveredbases"], reverse = True):
+            clusterquery = cluster["query"] 
+            for align in sorted(cluster["aligns"], key=lambda a: (a["targetstart"], a["targetend"])):
+                if lca95 is None:
+                    clustername = "Cluster" + str(clusterno)
+                else:
+                    clustername = "SmallCluster" + str(clusterno)
+                refentrybedstring = refentrybedstring + refentry + "\t" + str(align["targetstart"]) + "\t" + str(align["targetend"]) + "\t" + clusterquery + "_" + str(align["querystart"]) + "_" + str(align["queryend"]) + "_" + clustername + "\n"
+            clusterno = clusterno + 1
+
+            if lca95 is None:
+                totalnonexcludedcovered = totalnonexcludedcovered + cluster["nrnonexcludedcoveredbases"]
+            clustercount = clustercount + 1
+            if lca95 is None and totalnonexcludedcovered > 0.95*refnelength:
+                lca95 = clustercount
+                nca95 = cluster["nrnonexcludedcoveredbases"]
+
+        refentrybedtool = pybedtools.BedTool(refentrybedstring, from_string = True)
+        refentrybedtool.saveas(alignplotprefix + "." + refentry + ".clusters.bed")
+
+        if lca95 is not None:
+            print(str(lca95) + " clusters of alignments cover " + str(totalnonexcludedcovered) + " out of " + str(refnelength) + " non-excluded bases on entry " + refentry + " with NCA95 " + str(nca95))
+        else:
+            print("Not enough aligned query sequence to cover 95% of " + str(refnelength) + " bases on entry " + refentry)
+        
+
+def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):
+
+    alignstart = align['targetstart']
+    alignend = align['targetend']
+    alignquery = align['query']
+    alignquerystart = align['querystart']
+    alignqueryend = align['queryend']
+    alignslope = (alignend - alignstart)/(alignqueryend-alignquerystart)
+    if align['strand']=='-':
+        alignslope = -1.0*alignslope
+    alignintercept = alignstart - int(alignslope * alignquerystart)
+
+    # try to assign this align to a pre-existing cluster of aligns:
+    assigned = False
+    for cluster in alignclusters:
+        if cluster["query"] != alignquery:
+            continue
+        clusterquery = cluster["query"]
+        clusterslope = cluster["slope"]
+        clusterintercept = cluster["intercept"]
+        predstart = clusterintercept + clusterslope * alignquerystart
+        if abs(predstart - alignstart) <= maxdistance:
+            cluster["aligns"].append(align)
+            assigned = True
+            break
+
+    # create a new cluster if none were appropriate
+    if not assigned:
+        alignclusters.append({'query':alignquery, 'slope':alignslope, 'intercept':alignintercept, 'aligns':[align]})
+
+    return alignclusters
+
+def split_disjoint_clusters(refalignclusters:list, maxdistance:int)->list:
+
+    spinoffclusters = []
+    for cluster in refalignclusters:
+        if len(cluster["aligns"])==1:
+            continue
+
+        runningalignlist = []
+        maxposition = 0
+        for align in sorted(cluster["aligns"], key=lambda a: (a["targetstart"], a["targetend"])):
+            # do we have too big a gap?
+            if len(runningalignlist) > 0 and align["targetstart"] - maxposition > maxdistance:
+                spinoffclusters.append({'query':cluster["query"], 'slope':cluster["slope"], 'intercept':cluster["intercept"], 'aligns':runningalignlist})
+                runningalignlist = []
+                maxposition = 0
+            runningalignlist.append(align)
+            maxposition = max(maxposition, align["targetend"])
+        cluster["aligns"] = runningalignlist
+
+    return refalignclusters + spinoffclusters
 

@@ -1,8 +1,8 @@
 import shutil
 from pathlib import Path
 
-def create_output_directory(args)->None:
-    directory = args.prefix
+def create_output_directory(directory)->None:
+    #directory = args.prefix
     path = Path(directory)
     print("Creating directory " + directory + " for output")
     path.mkdir(exist_ok=True)
@@ -11,6 +11,9 @@ def create_output_directory(args)->None:
 
 def name_output_files(args, outputdir:str)->dict:
     files = {}
+    files["allexcludedbed"] = outputdir + "/excludedregions." + args.benchmark + ".bed"
+    files["alignplotdir"] = outputdir + "/alignmentplots"
+    files["alignplotprefix"] = outputdir + "/alignmentplots/clustered_aligns"
     files["testgenomebed"] = outputdir + "/genome." + args.assembly + ".bed"
     if not args.n_bedfile:
         files["testnbed"] = outputdir + "/nlocs." + args.assembly + ".bed"

@@ -7,30 +7,50 @@ import time
 # create namedtuple for bed intervals:
 bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
 
-def write_genome_bedfile(queryobj, args, genome_bedfile=None )->pybedtools.BedTool:
+def write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedobjects):
+
+    write_excluded_bedfile(args, benchparams, outputfiles, bedobjects)
+    write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects)
+    find_all_ns(queryobj, args, outputfiles, bedobjects)
+
+def write_excluded_bedfile(args, benchparams, outputfiles, bedobjects):
+
+    allexcludedbedfiles = []
+    if args.excludefile is not None:
+        allexcludedbedfiles.append(args.excludefile)
+    if "excluderegions" in benchparams.keys():
+        allexcludedbedfiles.append(benchparams["excluderegions"])
+    if "nstretchregions" in benchparams.keys():
+        allexcludedbedfiles.append(benchparams["nstretchregions"])
+    if len(allexcludedbedfiles) == 0:
+        bedobjects["allexcludedregions"] = pybedtools.BedTool("", from_string = True)
+    elif len(allexcludedbedfiles) == 1:
+        bedobjects["allexcludedregions"] = pybedtools.BedTool(allexcludedbedfiles[0])
+    elif len(allexcludedbedfiles) > 1:
+        bedobjects["allexcludedregions"] = bedtoolslib.mergemultiplebedfiles(allexcludedbedfiles)
+    bedobjects["allexcludedregions"].saveas(outputfiles["allexcludedbed"])
+
+    return 0
+
+def write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects):
+
     genomebedstring = ""
-    with open(genome_bedfile, "w") as gfh:
-        for scaffold in queryobj.references:
-            scaffoldlength = queryobj.get_reference_length(scaffold)
-            scaffstring = scaffold + "\t0\t" + str(scaffoldlength - 1) + "\n"
-            gfh.write(scaffstring)
-            genomebedstring += scaffstring
+    for scaffold in queryobj.references:
+        scaffoldlength = queryobj.get_reference_length(scaffold)
+        scaffstring = scaffold + "\t0\t" + str(scaffoldlength - 1) + "\n"
+        genomebedstring += scaffstring
+    bedobjects["testgenomeregions"] = pybedtools.BedTool(genomebedstring, from_string = True)
+    bedobjects["testgenomeregions"].saveas(outputfiles["testgenomebed"])
 
-    return pybedtools.BedTool(genomebedstring, from_string = True)
+    return 0
 
-def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
+def find_all_ns(queryobj, args, outputfiles, bedobjects)->list:
 
     # did the command-line arguments specify a pre-existing bedfile of N-stretch locations?
     user_n_file = args.n_bedfile
-    if n_bedfile:
-        nfh = open(n_bedfile, "w")
-    if atgc_bedfile:
-        atgcfh = open(atgc_bedfile, "w")
 
     if not user_n_file:
         p = re.compile("N+")
-    else:
-        ofh = open(user_n_file, "r")
 
     gapbedstring = ""
     contigbedstring = ""
@@ -65,37 +85,36 @@ def find_all_ns(queryobj, args, n_bedfile=None, atgc_bedfile=None )->list:
             contignum = 1
             contigstart = 0
             findstring = 'N' * args.minns
-            if n_bedfile:
-                #startfindn = time.time()
-                chromseq = queryobj.fetch(ref).upper()
-                refend = queryobj.get_reference_length(ref)
-                start = chromseq.find(findstring)
-                while start != -1:
-                    end = start + args.minns
-                    while end < refend and chromseq[end] == 'N':
-                        end = end + 1
-                    if end - start >= args.minns:
-                        if n_bedfile:
-                            gapname = "N." + ref + "." + str(contignum)
-                            gapstring = ref + "\t" + str(start) + "\t" + str(end) + "\t" + gapname + "\n"
-                            nfh.write(gapstring)
-                            gapbedstring += gapstring
-                        contigend = start
-                        contigname = ref + "." + str(contignum)
-                        contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(contigend) + "\t" + contigname + "\n"
-                        contignum = contignum + 1
-                        contigstart = end
-                    start = chromseq.find(findstring, end, refend)
+            chromseq = queryobj.fetch(ref).upper()
+            refend = queryobj.get_reference_length(ref)
+            start = chromseq.find(findstring)
+            while start != -1:
+                end = start + args.minns
+                while end < refend and chromseq[end] == 'N':
+                    end = end + 1
+                if end - start >= args.minns:
+                    gapname = "N." + ref + "." + str(contignum)
+                    gapstring = ref + "\t" + str(start) + "\t" + str(end) + "\t" + gapname + "\n"
+                    gapbedstring += gapstring
+                    contigend = start
+                    contigname = ref + "." + str(contignum)
+                    contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(contigend) + "\t" + contigname + "\n"
+                    contignum = contignum + 1
+                    contigstart = end
+                start = chromseq.find(findstring, end, refend)
 
                 contigname = ref + "." + str(contignum)
                 contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + contigname + "\n"
-        if n_bedfile:
-            nfh.close()
-    if atgc_bedfile:
-        atgcfh.write(contigbedstring)
-        atgcfh.close()
 
-    return [pybedtools.BedTool(contigbedstring, from_string = True), pybedtools.BedTool(gapbedstring, from_string = True)]
+        bedobjects["testnonnregions"] = pybedtools.BedTool(contigbedstring, from_string = True)
+        bedobjects["testnregions"] = pybedtools.BedTool(gapbedstring, from_string = True)
+
+    if outputfiles["testnonnbed"]:
+        bedobjects["testnonnregions"].saveas(outputfiles["testnonnbed"])
+    if outputfiles["testnbed"]:
+        bedobjects["testnregions"].saveas(outputfiles["testnbed"])
+
+    return 0
 
 def revcomp(seq:str) -> str:
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', 'M': 'N', 'K': 'N', 'R': 'N', 'W': 'N', 'Y': 'N'}

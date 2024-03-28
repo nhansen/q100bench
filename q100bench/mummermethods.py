@@ -107,7 +107,7 @@ def filter_aligns(alignlist:list, sorttype="target", maxoverlap=0.95):
 
         i = allbest[bestpick]
         while i != -1:
-            print(lis[i]["align"]["target"] + "\t" + str(lis[i]["align"]["targetstart"]) + "\t" + str(lis[i]["align"]["targetend"]) + "\t" + lis[i]["align"]["query"] + "\t" + str(lis[i]["align"]["querylow"]) + "\t" + str(lis[i]["align"]["queryhigh"]) + "\t" + lis[i]["align"]["strand"] + "\t" + str(i))
+            #print(lis[i]["align"]["target"] + "\t" + str(lis[i]["align"]["targetstart"]) + "\t" + str(lis[i]["align"]["targetend"]) + "\t" + lis[i]["align"]["query"] + "\t" + str(lis[i]["align"]["querylow"]) + "\t" + str(lis[i]["align"]["queryhigh"]) + "\t" + lis[i]["align"]["strand"] + "\t" + str(i))
             filteredaligns.insert(0, lis[i]["align"])
             i = lis[i]["from"]
 

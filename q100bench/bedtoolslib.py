@@ -19,6 +19,30 @@ def mergebed(bedfile:str)->str:
 
     return [mergedints, mergedbed]
 
+def mergeintervals(intervals):
+
+    mergedints = intervals.merge(c=4, o='collapse', delim="|")
+
+    return mergedints
+
+def mergemultiplebedfiles(bedfilelist:list):
+
+    if len(bedfilelist < 2):
+        print("Cannot call mergemultiplebedfiles on less than two bed files!")
+        exit(1)
+
+    firstbedtool = pybedtools.bedtool.BedTool(bedfilelist[0])
+    allbedtools = firstbedtool.cat(bedfilelist[1:])
+
+    return allbedtools
+
+def bedsum(intervals)->int:
+
+    alllengths = map(len, intervals)
+    bedsum = sum(alllengths)
+
+    return bedsum
+
 def intersectbed(bedfile1:str, bedfile2:str, outputfile:str, writefirst=False, writeboth=False, outerjoin=False)->str:
 
     print("Intersecting " + bedfile1 + " and " + bedfile2 + " to create " + outputfile)
@@ -34,4 +58,10 @@ def intersectbed(bedfile1:str, bedfile2:str, outputfile:str, writefirst=False, w
     intersectbed = pybedtools.bedtool.BedTool(outputfile)
 
     return [intersectbed, outputfile]
+
+def intersectintervals(intervals1, intervals2, unique=False, v=False):
+
+    intersectedints = intervals1.intersect(intervals2, v=v)
+
+    return intersectedints
 
