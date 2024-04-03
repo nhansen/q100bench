@@ -103,8 +103,8 @@ def find_all_ns(queryobj, args, outputfiles, bedobjects)->list:
                     contigstart = end
                 start = chromseq.find(findstring, end, refend)
 
-                contigname = ref + "." + str(contignum)
-                contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + contigname + "\n"
+            contigname = ref + "." + str(contignum)
+            contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + contigname + "\n"
 
         bedobjects["testnonnregions"] = pybedtools.BedTool(contigbedstring, from_string = True)
         bedobjects["testnregions"] = pybedtools.BedTool(gapbedstring, from_string = True)
