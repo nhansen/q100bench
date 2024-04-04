@@ -120,7 +120,8 @@ multiplotaligns <- function(aligns, chromlength=NA, chromplotfile=NA) {
   }
 
   par(pardefault)
-  numplots <- length(querydf$query)  
+  numplots <- min(length(querydf$query), 4)
+
   if (numplots==1) {
     par(mfrow = c(1, 1))
     plotaligns(aligns, 1)

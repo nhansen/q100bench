@@ -326,6 +326,9 @@ def read_paf_aligns(paffile:str, mintargetlength=0)->list:
                 sys.print("Input paf-file has fewer than 12 tab-delimited columns. Unable to process.")
                 exit(1)
 
+            #if len(fields) > 12 and len(list(filter(lambda x:'tp:A:S' in x, fields[12:]))) > 0:
+                #continue
+
             querystart = int(querystartzb) + 1
             queryend = int(queryend)
             queryalignlength = queryend - int(querystartzb)
@@ -367,11 +370,12 @@ def read_bam_aligns(bamobj, mintargetlength=0)->list:
             else:
                 queryleft = queryend
                 queryright = querystart
-                alignlist.append({'query':query, 'querylength':querylength, 'queryend':queryend, 'querystart':querystart, 'queryalignlength':queryend-querystart+1, 'strand':'-', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend, 'targetalignlength':refend-refstart+1})
+                alignlist.append({'query':query, 'querylength':querylength, 'queryend':querystart, 'querystart':queryend, 'queryalignlength':queryend-querystart+1, 'strand':'-', 'target':ref, 'targetlength':targetlength, 'targetstart':refstart, 'targetend':refend, 'targetalignlength':refend-refstart+1})
 
     return alignlist
 
-def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles, bedobjects):
+# this routine assumes query start > query end for reverse strand alignments
+def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedobjects, benchmark_stats, args):
 
     # maximum separating distance along target to include in one cluster of alignments
     maxdistance = args.maxclusterdistance
@@ -400,6 +404,7 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles
     # assess each benchmark entry, one by one
     for refentry in sorted(aligndict.keys()):
         refnelength = refnonexcludedlength[refentry]
+        #print(refentry + " nonexcluded length " + str(refnelength))
         refalignclusters = []
         # sort alignments from longest (along the benchmark) to shortest:
         aligndict[refentry].sort(reverse=True, key=lambda align: align["targetalignlength"])
@@ -410,7 +415,8 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles
             alignquery = refalign['query']
             alignquerystart = refalign['querystart']
             alignqueryend = refalign['queryend']
-            refalignclusters = add_align_to_clusters(refalign, refalignclusters, maxdistance)
+            #print("Adding align " + str(alignrefstart) + " to " + str(alignrefend))
+            add_align_to_clusters(refalign, refalignclusters, maxdistance)
 
         # split clusters that are separated along the target by more than maxdistance:
         refalignclusters = split_disjoint_clusters(refalignclusters, maxdistance)
@@ -418,6 +424,8 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles
         for cluster in sorted(refalignclusters, key=lambda c: c["aligns"][0]["targetstart"]):
             clusterquery = cluster["query"] 
             clusterslope = cluster["slope"]
+            if clusterslope < 0:
+                print("Cluster on " + refentry + " for query " + clusterquery + " from " + str(cluster["aligns"][0]["targetstart"]) + " (query " + str(cluster["aligns"][0]["querystart"]) + " is reverse strand")
             clusterintercept = cluster["intercept"]
             clusterbedstring = ""
             for align in sorted(cluster["aligns"], key=lambda a: (a["targetstart"], a["targetend"])):
@@ -460,7 +468,8 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, args, outputfiles
             print(str(lca95) + " clusters of alignments cover " + str(totalnonexcludedcovered) + " out of " + str(refnelength) + " non-excluded bases on entry " + refentry + " with NCA95 " + str(nca95))
         else:
             print("Not enough aligned query sequence to cover 95% of " + str(refnelength) + " non-excluded bases on entry " + refentry)
-        
+    
+    return benchmark_stats
 
 def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):
 
@@ -490,9 +499,10 @@ def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):
 
     # create a new cluster if none were appropriate
     if not assigned:
+        print("Appending new cluster")
         alignclusters.append({'query':alignquery, 'slope':alignslope, 'intercept':alignintercept, 'aligns':[align]})
 
-    return alignclusters
+    return 0
 
 def split_disjoint_clusters(refalignclusters:list, maxdistance:int)->list:
 

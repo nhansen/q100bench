@@ -147,10 +147,14 @@ def main() -> None:
 
     # find clusters of consistent, covering alignments and calculate continuity statistics:
     print("Assessing overall structural alignment of assembly")
-    alignparse.assess_overall_structure(rlis_aligndata, refobj, queryobj, args, outputfiles, bedregiondict)
+    alignparse.assess_overall_structure(rlis_aligndata, refobj, queryobj, outputfiles, bedregiondict, benchmark_stats, args)
 
     if not args.structureonly:
        print("Writing bed files of regions covered by alignments of " + args.assembly + " to " + args.benchmark)
+       # read in locations of het variants in the benchmark:
+       hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
+       hetarrays = phasing.sort_chrom_hetsite_arrays(hetsites)
+       
        [refcoveredbed, querycoveredbed, variants, hetsitealleles] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["variantbed"], outputfiles["coveredhetsitealleles"], args)
 
        # create merged unique outputfiles:
@@ -159,20 +163,16 @@ def main() -> None:
        [mergedtestpatcoveredbed, outputfiles["mergedtestpatcovered"]] = bedtoolslib.mergebed(outputfiles["testpatcovered"])
    
        print("Writing primary alignment statistics about " + args.assembly + " assembly")
-       benchmark_stats = stats.write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
-       #benchmark_stats = stats.write_aligned_stats(refobj, queryobj, refcoveredbed, querycoveredbed, outputfiles, benchmark_stats, args)
+       stats.write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
+       #stats.write_aligned_stats(refobj, queryobj, refcoveredbed, querycoveredbed, outputfiles, benchmark_stats, args)
 
        if alignobj is not None:
    
-           # read in locations of het variants in the benchmark:
-           hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
-           hetarrays = phasing.sort_chrom_hetsite_arrays(hetsites)
-       
            # classify variant errors as phasing or novel errors:
            print("Writing phase switch statistics")
            stats.write_het_stats(outputfiles, benchmark_stats, args)
            print("Determining whether errors are switched haplotype or novel")
-           benchmark_stats = errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, benchmark_stats, args)
+           errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, benchmark_stats, args)
            stats.write_qv_stats(benchmark_stats, outputfiles, args)
 
            # evaluate mononucleotide runs:
