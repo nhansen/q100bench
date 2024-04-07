@@ -13,6 +13,7 @@ from q100bench import errors
 from q100bench import output
 from q100bench import seqparse
 from q100bench import alignparse
+from q100bench import structvar
 from q100bench import phasing
 from q100bench import stats
 from q100bench import mummermethods
@@ -143,11 +144,13 @@ def main() -> None:
 
     # find general stats about contig/scaffold lengths, N/L50's, etc.:
     print("Writing general statistics about " + args.assembly + " assembly")
-    benchmark_stats = stats.write_general_assembly_stats(outputfiles["generalstatsfile"], refobj, queryobj, bedregiondict["testnonnregions"], bedregiondict["testnregions"], args)
+    benchmark_stats = stats.write_general_assembly_stats(refobj, queryobj, bedregiondict["testnonnregions"], bedregiondict["testnregions"], outputfiles, args)
 
     # find clusters of consistent, covering alignments and calculate continuity statistics:
     print("Assessing overall structural alignment of assembly")
     alignparse.assess_overall_structure(rlis_aligndata, refobj, queryobj, outputfiles, bedregiondict, benchmark_stats, args)
+    structvar.write_structural_errors(refobj, queryobj, outputfiles, benchmark_stats, args)
+    stats.write_aligned_cluster_stats(outputfiles, benchmark_stats, args)
 
     if not args.structureonly:
        print("Writing bed files of regions covered by alignments of " + args.assembly + " to " + args.benchmark)
@@ -164,7 +167,6 @@ def main() -> None:
    
        print("Writing primary alignment statistics about " + args.assembly + " assembly")
        stats.write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
-       #stats.write_aligned_stats(refobj, queryobj, refcoveredbed, querycoveredbed, outputfiles, benchmark_stats, args)
 
        if alignobj is not None:
    

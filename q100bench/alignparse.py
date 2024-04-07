@@ -377,6 +377,11 @@ def read_bam_aligns(bamobj, mintargetlength=0)->list:
 # this routine assumes query start > query end for reverse strand alignments
 def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedobjects, benchmark_stats, args):
 
+    # create a "clustercoverage" dictionary that will contain each chromosomes number of clusters and bases covered
+    benchmark_stats["clustercoverage"] = {}
+    benchmark_stats["alignclusters"] = {}
+    benchmark_stats["numnonexcludedbases"] = {}
+
     # maximum separating distance along target to include in one cluster of alignments
     maxdistance = args.maxclusterdistance
 
@@ -385,13 +390,12 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
     alignplotprefix = outputfiles["alignplotprefix"]
 
     # ref nonexcluded dict:
-    refnonexcludedlength = {}
     for ref in refobj.references:
-        refnonexcludedlength[ref] = refobj.get_reference_length(ref)
+        benchmark_stats["numnonexcludedbases"][ref] = refobj.get_reference_length(ref)
 
     for interval in bedobjects["allexcludedregions"]:
         ref = interval.chrom
-        refnonexcludedlength[ref] = refnonexcludedlength[ref] - len(interval)
+        benchmark_stats["numnonexcludedbases"][ref] = benchmark_stats["numnonexcludedbases"][ref] - len(interval)
 
     aligndict = {}
     for align in aligndata:
@@ -403,7 +407,7 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
 
     # assess each benchmark entry, one by one
     for refentry in sorted(aligndict.keys()):
-        refnelength = refnonexcludedlength[refentry]
+        refnelength = benchmark_stats["numnonexcludedbases"][refentry]
         #print(refentry + " nonexcluded length " + str(refnelength))
         refalignclusters = []
         # sort alignments from longest (along the benchmark) to shortest:
@@ -424,8 +428,8 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
         for cluster in sorted(refalignclusters, key=lambda c: c["aligns"][0]["targetstart"]):
             clusterquery = cluster["query"] 
             clusterslope = cluster["slope"]
-            if clusterslope < 0:
-                print("Cluster on " + refentry + " for query " + clusterquery + " from " + str(cluster["aligns"][0]["targetstart"]) + " (query " + str(cluster["aligns"][0]["querystart"]) + " is reverse strand")
+            #if clusterslope < 0:
+                #print("Cluster on " + refentry + " for query " + clusterquery + " from " + str(cluster["aligns"][0]["targetstart"]) + " (query " + str(cluster["aligns"][0]["querystart"]) + ") is reverse strand")
             clusterintercept = cluster["intercept"]
             clusterbedstring = ""
             for align in sorted(cluster["aligns"], key=lambda a: (a["targetstart"], a["targetend"])):
@@ -464,10 +468,10 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
         refentrybedtool = pybedtools.BedTool(refentrybedstring, from_string = True)
         refentrybedtool.saveas(alignplotprefix + "." + refentry + ".clusters.bed")
 
-        if lca95 is not None:
-            print(str(lca95) + " clusters of alignments cover " + str(totalnonexcludedcovered) + " out of " + str(refnelength) + " non-excluded bases on entry " + refentry + " with NCA95 " + str(nca95))
-        else:
-            print("Not enough aligned query sequence to cover 95% of " + str(refnelength) + " non-excluded bases on entry " + refentry)
+        # Note: lca95 will be "None" for reference entries not able to be covered
+        benchmark_stats["clustercoverage"][refentry] = {"lca95":lca95, "nonexcludedcovered":totalnonexcludedcovered}
+        refalignclusters.sort(key=lambda c: c["aligns"][0]["targetstart"])
+        benchmark_stats["alignclusters"][refentry] = refalignclusters
     
     return benchmark_stats
 
@@ -479,8 +483,6 @@ def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):
     alignquerystart = align['querystart']
     alignqueryend = align['queryend']
     alignslope = (alignend - alignstart)/(alignqueryend-alignquerystart)
-    if align['strand']=='-':
-        alignslope = -1.0*alignslope
     alignintercept = alignstart - int(alignslope * alignquerystart)
 
     # try to assign this align to a pre-existing cluster of aligns:
@@ -499,7 +501,6 @@ def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):
 
     # create a new cluster if none were appropriate
     if not assigned:
-        print("Appending new cluster")
         alignclusters.append({'query':alignquery, 'slope':alignslope, 'intercept':alignintercept, 'aligns':[align]})
 
     return 0

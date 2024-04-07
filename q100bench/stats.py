@@ -1,9 +1,12 @@
 import re
 import math
 
-def write_general_assembly_stats(generalstatspath, refobj, queryobj, contigsbed, gapsbed, args)->dict:
+def write_general_assembly_stats(refobj, queryobj, contigregions, gapregions, outputfiles, args)->dict:
 
     bmstats = {}
+
+    generalstatspath = outputfiles["generalstatsfile"]
+    scafflengthfile = outputfiles["scaffoldlengths"]
 
     # total bases on benchmark haplotypes (for NG/LG calculation):
     hap1totalbases = 0
@@ -20,6 +23,7 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contigsbed,
 
     bmstats['hap1totalbases'] = hap1totalbases # this is the total number of bases in the MATERNAL benchmark chroms
     bmstats['hap2totalbases'] = hap2totalbases # this is the total number of bases in the PATERNAL benchmark chroms
+    avghaptotalbases = (hap1totalbases + hap2totalbases)/2.0
     bmstats['totalbases'] = hap1totalbases + hap2totalbases
 
     mincontiglength = args.mincontiglength
@@ -40,27 +44,31 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contigsbed,
         scaffold_lengths = queryobj.lengths
 
         scaffold_lengths.sort(reverse=True)
-        for scafflength in scaffold_lengths:
-            cumscaffbases = cumscaffbases + scafflength
-            numscaffs = numscaffs + 1
-            if cumscaffbases > 0.5*totalscaffoldbases and scaffold_n50 == 0:
-                scaffold_n50 = scafflength
-                scaffold_l50 = numscaffs
-            if cumscaffbases > 0.5*hap1totalbases and scaffold_hap1_ng50 == 0:
-                scaffold_hap1_ng50 = scafflength
-                scaffold_hap1_lg50 = numscaffs
-            if cumscaffbases > 0.5*hap2totalbases and scaffold_hap2_ng50 == 0:
-                scaffold_hap2_ng50 = scafflength
-                scaffold_hap2_lg50 = numscaffs
-            scaffold_hap1_aung = scaffold_hap1_aung + scafflength*scafflength/hap1totalbases
-            scaffold_hap2_aung = scaffold_hap2_aung + scafflength*scafflength/hap2totalbases
+        with open(scafflengthfile, "w") as sfh:
+            for scafflength in scaffold_lengths:
+                cumscaffbases = cumscaffbases + scafflength
+                numscaffs = numscaffs + 1
+                if cumscaffbases > 0.5*totalscaffoldbases and scaffold_n50 == 0:
+                    scaffold_n50 = scafflength
+                    scaffold_l50 = numscaffs
+                if cumscaffbases > 0.5*hap1totalbases and scaffold_hap1_ng50 == 0:
+                    scaffold_hap1_ng50 = scafflength
+                    scaffold_hap1_lg50 = numscaffs
+                if cumscaffbases > 0.5*hap2totalbases and scaffold_hap2_ng50 == 0:
+                    scaffold_hap2_ng50 = scafflength
+                    scaffold_hap2_lg50 = numscaffs
+                scaffold_hap1_aung = scaffold_hap1_aung + scafflength*scafflength/hap1totalbases
+                scaffold_hap2_aung = scaffold_hap2_aung + scafflength*scafflength/hap2totalbases
+                perctotallength = int(1000.0*cumscaffbases/avghaptotalbases + 0.5)/10.0
+                # At some point, may want to pull scaffold name into last field for use in annotating plots
+                sfh.write(str(perctotallength) + "\t" + str(scafflength) + "\t" + str(cumscaffbases) + "\tNA\n")
 
         totalns = 0
-        for gap in gapsbed:
+        for gap in gapregions:
             gaplength = len(gap)
             totalns = totalns + gaplength
 
-        numcontigs = len(contigsbed)
+        numcontigs = len(contigregions)
         contig_n50 = 0
         contig_hap1_ng50 = 0
         contig_hap2_ng50 = 0
@@ -72,7 +80,7 @@ def write_general_assembly_stats(generalstatspath, refobj, queryobj, contigsbed,
         numlargecontigs = 0
         sizelist = []
         totalsize = 0
-        for contig in contigsbed:
+        for contig in contigregions:
             contiglength = len(contig)
             if contiglength >= mincontiglength:
                 numlargecontigs = numlargecontigs + 1
@@ -237,6 +245,46 @@ def write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedte
         gsfh.write("PAT " + args.benchmark + " covered: " + str(patbenchcovered) + "/" + str(bmstats['hap2totalbases']) + " (" + str(percpatbenchcovered) + "% of PAT bases in benchmark)" + "\n")
 
     return bmstats
+
+def write_aligned_cluster_stats(outputfiles:dict, bmstats:dict, args)->int:
+    structstatsfile = outputfiles['clusterlengths']
+
+    alignclusters = bmstats['alignclusters']
+    hap1totalbases = bmstats['hap1totalbases'] # total MATERNAL bases in benchmark
+    hap2totalbases = bmstats['hap2totalbases'] # total PATERNAL bases in benchmark
+    avghaptotalbases = (hap1totalbases + hap2totalbases)/2.0
+
+    allclusters = []
+
+    for refentry in alignclusters.keys():
+        refclusters = alignclusters[refentry]
+        for cluster in refclusters:
+            clusteraligns = cluster["aligns"]
+            clusterlow = None
+            clusterhigh = None
+            for align in clusteraligns:
+                if clusterlow is None or align["targetstart"] < clusterlow:
+                    clusterlow = align["targetstart"]
+                if clusterhigh is None or align["targetend"] > clusterhigh:
+                    clusterhigh = align["targetend"]
+
+            print(refentry + " cluster " + str(clusterlow) + "-" + str(clusterhigh))
+            cluster["spanlength"] = clusterhigh - clusterlow + 1
+            cluster["refentry"] = refentry
+            allclusters.append(cluster)
+
+    allclusters.sort(key=lambda x:x["spanlength"], reverse=True)
+    totallength = 0
+    with open(structstatsfile, "w") as cfh:
+        for cluster in allclusters:
+            spanlength = cluster["spanlength"]
+            totallength = totallength + spanlength
+            perctotallength = int(1000.0*totallength/avghaptotalbases + 0.5)/10.0
+            refentry = cluster["refentry"]
+            print(str(spanlength) + "\t" + str(totallength) + "\t" + refentry)
+            cfh.write(str(perctotallength) + "\t" + str(spanlength) + "\t" + str(totallength) + "\t" + refentry + "\n")
+
+    return 0
 
 def write_aligned_stats(refobj, queryobj, truthcoveredbed, bedfiles:dict, bmstats:dict, args)->dict:
 

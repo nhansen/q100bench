@@ -13,7 +13,7 @@ def name_output_files(args, outputdir:str)->dict:
     files = {}
     files["allexcludedbed"] = outputdir + "/excludedregions." + args.benchmark + ".bed"
     files["alignplotdir"] = outputdir + "/alignmentplots"
-    files["alignplotprefix"] = outputdir + "/alignmentplots/clustered_aligns"
+    files["alignplotprefix"] = outputdir + "/alignmentplots/" + args.assembly + ".clustered_aligns"
     files["testgenomebed"] = outputdir + "/genome." + args.assembly + ".bed"
     if not args.n_bedfile:
         files["testnbed"] = outputdir + "/nlocs." + args.assembly + ".bed"
@@ -28,7 +28,11 @@ def name_output_files(args, outputdir:str)->dict:
     else:
         files["variantbed"] = args.variantfile
     files["generalstatsfile"] = outputdir + "/" + args.assembly + ".generalstats.txt"
+    files["scaffoldlengths"] = outputdir + "/" + args.assembly + ".scaffoldlengths.txt"
     files["mononucstatsfile"] = outputdir + "/" + args.assembly + ".mononucstats.txt"
+    files["structdetailsfile"] = outputdir + "/" + args.assembly + ".structurestats.txt"
+    files["structvariantsvcf"] = outputdir + "/" + args.assembly + ".svs.vcf"
+    files["clusterlengths"] = outputdir + "/alignmentplots/" + args.assembly + ".alignclusterlengths.txt"
     files["coveredmononucsfile"] = outputdir + "/" + args.assembly + ".coveredmononucs." + args.benchmark + ".bed"
     files["mononucswithvariantsfile"] = outputdir + "/" + args.assembly + ".mononucswithvariants." + args.benchmark + ".bed"
     files["bencherrortypebed"] = outputdir + "/" + args.assembly + ".errortype." + args.benchmark + ".bed"
