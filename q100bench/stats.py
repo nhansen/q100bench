@@ -7,6 +7,7 @@ def write_general_assembly_stats(refobj, queryobj, contigregions, gapregions, ou
 
     generalstatspath = outputfiles["generalstatsfile"]
     scafflengthfile = outputfiles["scaffoldlengths"]
+    contiglengthfile = outputfiles["contiglengths"]
 
     # total bases on benchmark haplotypes (for NG/LG calculation):
     hap1totalbases = 0
@@ -90,20 +91,23 @@ def write_general_assembly_stats(refobj, queryobj, contigregions, gapregions, ou
         sizelist.sort(reverse=True)
         cumcontigbases = 0
         numcontigs = 0
-        for contigsize in sizelist:
-            cumcontigbases = cumcontigbases + contigsize
-            numcontigs = numcontigs + 1
-            if cumcontigbases > 0.5*totalsize and contig_n50 == 0:
-                contig_n50 = contigsize
-                contig_l50 = numcontigs
-            if cumcontigbases > 0.5*hap1totalbases and contig_hap1_ng50 == 0:
-                contig_hap1_ng50 = contigsize
-                contig_hap1_lg50 = numcontigs
-            if cumcontigbases > 0.5*hap2totalbases and contig_hap2_ng50 == 0:
-                contig_hap2_ng50 = contigsize
-                contig_hap2_lg50 = numcontigs
-            contig_hap1_aung = contig_hap1_aung + contigsize*contigsize/hap1totalbases
-            contig_hap2_aung = contig_hap2_aung + contigsize*contigsize/hap2totalbases
+        with open(contiglengthfile, "w") as cfh:
+            for contigsize in sizelist:
+                cumcontigbases = cumcontigbases + contigsize
+                numcontigs = numcontigs + 1
+                if cumcontigbases > 0.5*totalsize and contig_n50 == 0:
+                    contig_n50 = contigsize
+                    contig_l50 = numcontigs
+                if cumcontigbases > 0.5*hap1totalbases and contig_hap1_ng50 == 0:
+                    contig_hap1_ng50 = contigsize
+                    contig_hap1_lg50 = numcontigs
+                if cumcontigbases > 0.5*hap2totalbases and contig_hap2_ng50 == 0:
+                    contig_hap2_ng50 = contigsize
+                    contig_hap2_lg50 = numcontigs
+                contig_hap1_aung = contig_hap1_aung + contigsize*contigsize/hap1totalbases
+                contig_hap2_aung = contig_hap2_aung + contigsize*contigsize/hap2totalbases
+                perctotallength = int(1000.0*cumcontigbases/avghaptotalbases + 0.5)/10.0
+                cfh.write(str(perctotallength) + "\t" + str(contigsize) + "\t" + str(cumcontigbases) + "\tNA\n")
         
         bmstats['totalns'] = totalns
 

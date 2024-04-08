@@ -28,6 +28,7 @@ def name_output_files(args, outputdir:str)->dict:
     else:
         files["variantbed"] = args.variantfile
     files["generalstatsfile"] = outputdir + "/" + args.assembly + ".generalstats.txt"
+    files["contiglengths"] = outputdir + "/" + args.assembly + ".contiglengths.txt"
     files["scaffoldlengths"] = outputdir + "/" + args.assembly + ".scaffoldlengths.txt"
     files["mononucstatsfile"] = outputdir + "/" + args.assembly + ".mononucstats.txt"
     files["structdetailsfile"] = outputdir + "/" + args.assembly + ".structurestats.txt"
