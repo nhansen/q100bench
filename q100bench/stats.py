@@ -590,6 +590,44 @@ def write_het_stats(bedfiles:dict, bmstats:dict, args):
 
     return 0
 
+def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
+
+    histogramfile = outputfiles["mononuchistfile"]
+    lengthcomposition = {}
+    with open(histogramfile, "w") as msfh:
+        msfh.write("BenchmarkLength\tReadLength\tNumCorrect\tNumHetAllele\tNumError\tNumComplex\n")
+        for mononuclength in sorted(stats.keys()):
+            lengthcomposition[mononuclength] = {'CORRECT':0, 'HET':0, 'INSERROR':0, 'DELERROR':0, 'COMPLEX':0}
+            for readmononuclength in sorted(stats[mononuclength].keys()):
+                numcorrect = 0
+                if "CORRECT" in stats[mononuclength][readmononuclength].keys():
+                    numcorrect = stats[mononuclength][readmononuclength]["CORRECT"]
+                    lengthcomposition[mononuclength]['CORRECT'] = lengthcomposition[mononuclength]['CORRECT'] + 1
+                numhetallele = 0
+                if "HET" in stats[mononuclength][readmononuclength].keys():
+                    numhetallele = stats[mononuclength][readmononuclength]["HET"]
+                    lengthcomposition[mononuclength]['HET'] = lengthcomposition[mononuclength]['HET'] + 1
+                numerror = 0
+                if "ERROR" in stats[mononuclength][readmononuclength].keys():
+                    numerror = stats[mononuclength][readmononuclength]["ERROR"]
+                    if readmononuclength > mononuclength:
+                        lengthcomposition[mononuclength]['INSERROR'] = lengthcomposition[mononuclength]['INSERROR'] + 1
+                    elif readmononuclength < mononuclength:
+                        lengthcomposition[mononuclength]['DELERROR'] = lengthcomposition[mononuclength]['DELERROR'] + 1
+                numcomplexallele = 0
+                if "COMPLEX" in stats[mononuclength][readmononuclength].keys():
+                    numcomplexallele = stats[mononuclength][readmononuclength]["COMPLEX"]
+                    lengthcomposition[mononuclength]['COMPLEX'] = lengthcomposition[mononuclength]['COMPLEX'] + 1
+                msfh.write(str(mononuclength) + "\t" + str(readmononuclength) + "\t" + str(numcorrect) + "\t" + str(numhetallele) + "\t" + str(numerror) + "\t" + str(numcomplexallele) + "\n")
+
+    mononuccompfile = outputfiles["mononuccompositionfile"]
+    with open(mononuccompfile, "w") as mcfh:
+        mcfh.write("BenchmarkLength\tNumCorrect\tNumHetAllele\tNumInsError\tNumDelError\tNumComplex\n")
+        for mononuclength in sorted(stats.keys()):
+            mcfh.write(str(mononuclength) + "\t" + str(lengthcomposition[mononuclength]['CORRECT']) + "\t" + str(lengthcomposition[mononuclength]['HET']) + "\t" + str(lengthcomposition[mononuclength]['INSERROR']) + "\t" + str(lengthcomposition[mononuclength]['DELERROR']) + "\t" + str(lengthcomposition[mononuclength]['COMPLEX']) + "\n")
+            
+
+
 def write_read_error_summary(stats:dict, outputfiles:dict):
     totalsnverrors = 0
     totalindelerrors = 0

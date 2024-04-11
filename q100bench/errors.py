@@ -122,50 +122,62 @@ def assess_mononuc_read_coverage(align_obj, region:str, mononucbedfile:str, mono
   
     mononucdict = {}
     msfh = open(mononucstatsfile, "w", buffering=1)
+    # for each mononuc run in the benchmark, retrieve reads, count length of mononuc, classify as CORRECT, HET, ERROR, or COMPLEX
     with open(mononucbedfile, "r") as mfh:
         mononucline = mfh.readline()
         while mononucline:
             mononucline = mononucline.rstrip()
             [chrom, start, end, name, score, strand, widestart, wideend, color] = mononucline.split("\t")
             runlength = int(end) - int(start)
+            if runlength not in mononucdict:
+                mononucdict[runlength] = {}
             namefields = name.split("_")
             repeatedbase = namefields[-1]
             refalleleseq = repeatedbase * runlength
-            #print(chrom + ":" + str(start) + "-" + str(end) + " " + repeatedbase + "\t" + str(runlength))
             for readalign in align_obj.fetch(contig=chrom, start=int(start), stop=int(end)):
                 if args.downsample is not None and random.random() >= args.downsample:
                     continue
-                pairs = readalign.get_aligned_pairs()
+                queryseq = readalign.query_sequence
+                if readalign.is_secondary or queryseq is None:
+                    continue
                 readname = readalign.query_name
+                if readalign.reference_start >= int(start) or readalign.reference_end <= int(end):
+                    print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not span " + chrom + ":" + start + "-" + end)
+                    continue
+                pairs = readalign.get_aligned_pairs()
                 if len(pairs) == 0:
                     continue
                 readstart = find_readpos_in_pairs(pairs, int(start)-1)
                 readend = find_readpos_in_pairs(pairs, int(end)+1)
                 if readstart is not None and readend is not None:
-                    queryseq = readalign.query_sequence
-                    if readalign.is_secondary or queryseq is None:
-                        continue
                     queryseq = queryseq.upper()
-                    alleleseq = queryseq[readstart:readend]
-                    alleleseq = alleleseq[1:-1]
+                    alleleseq = queryseq[readstart+1:readend-1]
                     if p[repeatedbase].match(alleleseq):
                         numbases = len(alleleseq)
-                        type = "CORRECT"
+                        matchtype = "CORRECT"
                         if numbases != runlength:
                             potentialhetname = chrom + "_" + str(int(start)+1) + "_" + refalleleseq + "_" + alleleseq
                             if potentialhetname in hetsitedict:
-                                type = "HET"
+                                matchtype = "HET"
                             else:
-                                type = "ERROR"
-                        msfh.write(chrom + "\t" + str(start) + "\t" + str(end) + "\t" + readname + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(numbases) + "\t" + type + "\n")
+                                matchtype = "ERROR"
                     else:
-                        msfh.write(chrom + "\t" + str(start) + "\t" + str(end) + "\t" + readname + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + "COMPLEX" + "\t" + type + "\n")
+                        numbases = -1
+                        matchtype = "COMPLEX"
+
+                    msfh.write(chrom + "\t" + str(start) + "\t" + str(end) + "\t" + readname + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(numbases) + "\t" + matchtype + "\n")
+                    if numbases not in mononucdict[runlength]:
+                        mononucdict[runlength][numbases] = {}
+                    if matchtype not in mononucdict[runlength][numbases]:
+                        mononucdict[runlength][numbases][matchtype] = 1
+                    else:
+                        mononucdict[runlength][numbases][matchtype] = mononucdict[runlength][numbases][matchtype] + 1
                 else:
                     print(readname + " is unaligned at one endpoint!")
 
             mononucline = mfh.readline()
 
-    return 0
+    return mononucdict
 
 def find_readpos_in_pairs(pairs, pos):
     alignlength = len(pairs)
@@ -259,7 +271,7 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                     stats["totalclippedbases"] = stats["totalclippedbases"] + cigartuples[-1][1]
             
             if not args.errorfile:
-                query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align, args)
+                query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align)
                 if strand == "F":
                     queryleft = querystart
                     queryright = queryend

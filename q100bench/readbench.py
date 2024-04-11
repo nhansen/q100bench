@@ -112,7 +112,7 @@ def main() -> None:
     args = parse_arguments(sys.argv[1:])
     #check_for_bedtools()
     no_rscript = check_for_R()
-    outputdir = output.create_output_directory(args)
+    outputdir = output.create_output_directory(args.prefix)
     benchparams = read_config_data(args)
 
     hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
@@ -133,8 +133,9 @@ def main() -> None:
         print("Assessing accuracy of mononucleotide runs")
         print(benchparams["mononucruns"])
         print(outputfiles["mononucstatsfile"])
-        mononucstats = errors.assess_mononuc_read_coverage(alignobj, args.region, benchparams["mononucruns"], outputfiles["mononucstatsfile"], hetsites, args)
-        #stats.write_mononuc_stats(mononucstats, outputfiles, benchmark_stats, args)
+        mononucstats = errors.assess_mononuc_read_coverage(alignobj, args.regions, benchparams["mononucruns"], outputfiles["mononucstatsfile"], hetsites, args)
+        stats.write_read_mononuc_stats(mononucstats, outputfiles, args)
+        plots.plot_read_mononuc_stats(args.readsetname, args.benchmark, outputdir)
     
     # evaluate errors within read alignments:
     if not args.nobaseerrors:
@@ -142,7 +143,7 @@ def main() -> None:
         print(outputfiles["readerrorfile"])
         errorstats = errors.assess_read_align_errors(alignobj, refobj, outputfiles["readerrorfile"], benchintervals, hetsites, args)
         stats.write_read_error_summary(errorstats, outputfiles)
-        #plots.plot_read_error_stats(outputfiles, error_stats, args)
+        plots.plot_read_error_stats(args.readsetname, args.benchmark, outputdir)
 
     # plot alignment coverage across assembly and genome:
     #if not no_rscript:

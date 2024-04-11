@@ -42,3 +42,19 @@ def plot_svcluster_align_plots(assemblyname:str, benchname:str, outputdir:str, r
             returnvalues.append(os.system(plotcommand))
     return returnvalues
 
+def plot_read_error_stats(readsetname:str, genomename:str, outputdir:str):
+    rfile_res = importlib.resources.files("q100bench").joinpath('IndelLengthPlot.R')
+    with importlib.resources.as_file(rfile_res) as rfile:
+        plotcommand = "Rscript " + str(rfile) + " " + readsetname + " " + genomename + " " + outputdir
+        print(plotcommand)
+        returnvalue = os.system(plotcommand)
+    return returnvalue
+
+def plot_read_mononuc_stats(readsetname:str, genomename:str, outputdir:str):
+    rfile_res = importlib.resources.files("q100bench").joinpath('ReadMononucAccuracy.R')
+    with importlib.resources.as_file(rfile_res) as rfile:
+        plotcommand = "Rscript " + str(rfile) + " " + readsetname + " " + genomename + " " + outputdir
+        print(plotcommand)
+        returnvalue = os.system(plotcommand)
+    return returnvalue
+
