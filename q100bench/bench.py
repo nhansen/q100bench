@@ -190,6 +190,7 @@ def main() -> None:
         if not args.structureonly:
             plots.plot_benchmark_align_coverage(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
             plots.plot_testassembly_align_coverage(args.assembly, outputdir, benchparams["resourcedir"])
+            plots.plot_assembly_error_stats(args.assembly, args.benchmark, outputdir)
             if alignobj is not None:
                 plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
         plots.plot_svcluster_align_plots(args.assembly, args.benchmark, outputfiles["alignplotdir"], benchparams["resourcedir"], refobj)

@@ -39,6 +39,12 @@ mndiffs <- function(filename, i) {
   return(diffcount)
 }
 
+onebaseindelratio <- function(filename) {
+  onebaseratio <- mndiffs(filename, 1)*1.0/mndiffs(filename, -1)
+  
+  return(onebaseratio)
+}
+
 diffarray <- function(filename, maxdiff=4) {
   platformdiffs <- sapply(seq(-1*maxdiff, maxdiff), function(i) {mndiffs(filename, i)})
   platformdiffs <- platformdiffs/sum(platformdiffs)
@@ -59,11 +65,13 @@ makemultiplot <- function(maxdiff=4) {
   mtext("Homopolymer length concordance", side = 3, line = 1, outer = TRUE)
 }
 
-plotmononuchist <- function(file, plottitle, maxdiff=4){
+plotmononuchist <- function(file, plottitle="", maxdiff=4){
   differences <- diffarray(file, maxdiff=maxdiff)
   accrate <- as.integer(differences[maxdiff+1]*1000)/10
   barplot(differences, names=seq(-1*maxdiff,maxdiff), col="blue", cex.names=1.0, main=plottitle, xlab="Difference from benchmark", ylab="Fraction of reads")
   mtext(paste(c("Accuracy: ", as.character(accrate), "%"), sep="", collapse=""), side=3, adj=0.85, line=-4)
+  indelratio <- as.integer(onebaseindelratio(file)*1000)/1000
+  mtext(paste(c("1bp Ins/Dels: ", as.character(indelratio)), sep="", collapse=""), side=3, adj=0.85, line=-5 )
 }
 
 mononucfile <- paste(c(outputdir, "/", readsetname, ".mononuchist.txt"), sep="", collapse="")

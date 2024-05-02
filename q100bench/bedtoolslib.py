@@ -59,9 +59,9 @@ def intersectbed(bedfile1:str, bedfile2:str, outputfile:str, writefirst=False, w
 
     return [intersectbed, outputfile]
 
-def intersectintervals(intervals1, intervals2, unique=False, v=False):
+def intersectintervals(intervals1, intervals2, v=False, wa=False):
 
-    intersectedints = intervals1.intersect(intervals2, v=v)
+    intersectedints = intervals1.intersect(intervals2, v=v, wa=wa)
 
     return intersectedints
 

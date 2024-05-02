@@ -9,14 +9,19 @@ outputdir <- ifelse(!( is.na(args[3])), args[3], ".")
 plottitle <- ifelse(!( is.na(args[4])), args[4], paste(c("Indel Sizes in ", readsetname, " vs ", genomename), sep="", collapse=""))
 
 # Function to plot indel histogram
-plotindellengths <- function(indellengthfile, outputdir, xlabval="Length difference", ylabval="Indel Errors per mb", titleval="") {
+plotindellengths <- function(indellengthfile, outputdir, xlabval="Length difference", ylabval="Indel Errors per mb", titleval="", ymax=NA) {
   indellengthhist <- read.table(indellengthfile, sep="\t")
   names(indellengthhist) <- c("indellength", "indelcount", "indelspermbaligned")
   
   insertionrates <- sapply(seq(1, 10), function(i) {indellengthhist[indellengthhist$indellength==i, "indelspermbaligned"]})
   deletionrates <- sapply(seq(-1, -10, -1), function(i) {indellengthhist[indellengthhist$indellength==i, "indelspermbaligned"]})
   
-  barplot(rbind(deletionrates, insertionrates), beside=TRUE, names.arg=seq(1,10), col=c("blue", "red"), main=titleval, xlab=xlabval, ylab=ylabval)
+  if (is.na(ymax)) {
+    barplot(rbind(deletionrates, insertionrates), beside=TRUE, names.arg=seq(1,10), col=c("blue", "red"), main=titleval, xlab=xlabval, ylab=ylabval)
+  }
+  else {
+    barplot(rbind(deletionrates, insertionrates), beside=TRUE, names.arg=seq(1,10), col=c("blue", "red"), main=titleval, xlab=xlabval, ylab=ylabval, ylim=c(0,ymax))
+  }
   legend("topright", c("Deletions", "Insertions"), col=c("blue", "red"), pch=15)
 }
 
@@ -28,6 +33,12 @@ makemultiplot <- function() {
   plotindellengths("hifirevio3cell", outputdir, titleval="HiFi Revio")
   plotindellengths("illumina2x250mat", outputdir, titleval="Illumina 2x250 (maternal)")
   plotindellengths("element_avitilongmat", outputdir, titleval="Element Aviti")
+}
+
+makebog2024posterplots <- function() {
+  # plots saved in "PlotsForAdamsBOGPoster2024/" called SequelDCv1.1IndelErrorRates.pdf and RevioDCv1.1.IndelErrorRates.pdf
+  plotindellengths("/Users/nhansen/HG002_diploid_benchmark/plots/assemblyerrorstats/sequel_DCv1.1_hap1.indelerrorstats.txt", ".", ymax=4.0, titleval="Sequel/DCv1.1")
+  plotindellengths("/Users/nhansen/HG002_diploid_benchmark/plots/assemblyerrorstats/RevioWashUDCv1.2Hap1.indelerrorstats.txt", ".", ymax=4.0, titleval="Revio/DCv1.1")
 }
 
 indelfile <- paste(c(outputdir, "/", readsetname, ".indelerrorstats.txt"), sep="", collapse="")

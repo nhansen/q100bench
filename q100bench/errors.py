@@ -1,8 +1,10 @@
 import re
 import sys
 import random
+import pybedtools
 from collections import namedtuple
 from q100bench import alignparse
+from q100bench import bedtoolslib
 
 # create namedtuple for bed intervals:
 bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
@@ -112,18 +114,27 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
 
     return result
 
-def assess_mononuc_read_coverage(align_obj, region:str, mononucbedfile:str, mononucstatsfile:str, hetsitedict, args):
+def assess_mononuc_read_coverage(align_obj, mononucbedfile, outputdict, bedintervals, hetsitedict, args):
 
     p = {}
     p["A"] = re.compile("^[aA]+$")
     p["T"] = re.compile("^[tT]+$")
     p["C"] = re.compile("^[cC]+$")
     p["G"] = re.compile("^[gG]+$")
-  
+
+    mononucstatsfile = outputdict["mononucstatsfile"]
+
+    mononucbedintervals = pybedtools.BedTool(mononucbedfile)
+    if bedintervals is not None:
+        includedmononucbeds = bedtoolslib.intersectintervals(mononucbedintervals, bedintervals, wa=True)
+        includedmononucbeds.saveas(outputdict["includedmononucfile"])
+    else:
+        mononucbedintervals.saveas(outputdict["includedmononucfile"])
+
     mononucdict = {}
     msfh = open(mononucstatsfile, "w", buffering=1)
     # for each mononuc run in the benchmark, retrieve reads, count length of mononuc, classify as CORRECT, HET, ERROR, or COMPLEX
-    with open(mononucbedfile, "r") as mfh:
+    with open(outputdict["includedmononucfile"], "r") as mfh:
         mononucline = mfh.readline()
         while mononucline:
             mononucline = mononucline.rstrip()
@@ -253,7 +264,7 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                 continue
    
             stats["totalalignedbases"] = stats["totalalignedbases"] + align.reference_length
-            if benchinterval is not None: # shorted aligned length contribution if necessary
+            if benchinterval is not None: # shorten aligned length contribution if necessary
                 if benchinterval.start > align.reference_start:
                     #print("Shortening aligned read length for " + align.query_name + " by " + str(benchinterval.start - align.reference_start))
                     stats["totalalignedbases"] = stats["totalalignedbases"] + align.reference_start - benchinterval.start
@@ -292,7 +303,6 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                     altallele = namefields[-2]
                     posend = pos + len(refallele) # this will be one base after pos for insertions, one base past end of ref allele otherwise
                     if benchinterval is not None and (variant.start < benchinterval.start or variant.end > benchinterval.end):
-                        #print("Skipping variant from " + str(variant.start) + " to " + str(variant.end) + " because not in interval " + regionstring)
                         continue
                     if namefields[-1] == "F":
                         alignstrand = '+'

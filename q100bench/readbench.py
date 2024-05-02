@@ -59,8 +59,8 @@ def restricted_float(x):
     except ValueError:
         raise argparse.ArgumentTypeError("%r not a floating-point literal" % (x,))
 
-    if x <= 0.0 or x >= 1.0:
-        raise argparse.ArgumentTypeError("%r not in range (0.0, 1.0)"%(x,))
+    if x <= 0.0 or x > 1.0:
+        raise argparse.ArgumentTypeError("%r not in range (0.0, 1.0]"%(x,))
     return x
 
 def parse_arguments(args):
@@ -133,7 +133,7 @@ def main() -> None:
         print("Assessing accuracy of mononucleotide runs")
         print(benchparams["mononucruns"])
         print(outputfiles["mononucstatsfile"])
-        mononucstats = errors.assess_mononuc_read_coverage(alignobj, args.regions, benchparams["mononucruns"], outputfiles["mononucstatsfile"], hetsites, args)
+        mononucstats = errors.assess_mononuc_read_coverage(alignobj, benchparams["mononucruns"], outputfiles, benchintervals, hetsites, args)
         stats.write_read_mononuc_stats(mononucstats, outputfiles, args)
         plots.plot_read_mononuc_stats(args.readsetname, args.benchmark, outputdir)
     
