@@ -42,7 +42,7 @@ def read_aligns(bamobj, args):
         if align.is_secondary:
             continue
         if align.reference_length >= args.minalignlength:
-            query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align, args)
+            query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align)
             querycoords = query + ":" + str(querystart) + "-" + str(queryend)
             refcoords = ref + ":" + str(refstart) + "-" + str(refend)
             querychrom = query.split("_")[0]
@@ -61,7 +61,7 @@ def find_hets_and_homregions(bamobj, refobj, queryobj, alignmap:dict, args):
     hetvariants = ""
     homregions = ""
     for align in bamobj.fetch():
-        query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align, args)
+        query, querystart, queryend, ref, refstart, refend, strand = alignparse.retrieve_align_data(align)
         querycoords = query + ":" + str(querystart) + "-" + str(queryend)
         refcoords = ref + ":" + str(refstart) + "-" + str(refend)
 
@@ -110,7 +110,7 @@ def main() -> None:
 
     alignmapping = {}
     for align1 in alignobj1.fetch():
-        ref1, refstart1, refend1, query1, querystart1, queryend1, strand1 = alignparse.retrieve_align_data(align1, args)
+        ref1, refstart1, refend1, query1, querystart1, queryend1, strand1 = alignparse.retrieve_align_data(align1)
         refcoords1 = ref1 + ":" + str(refstart1) + "-" + str(refend1)
         querycoords1 = query1 + ":" + str(querystart1) + "-" + str(queryend1)
 
