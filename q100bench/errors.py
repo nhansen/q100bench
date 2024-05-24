@@ -158,11 +158,13 @@ def assess_mononuc_read_coverage(align_obj, mononucbedfile, outputdict, bedinter
                 pairs = readalign.get_aligned_pairs()
                 if len(pairs) == 0:
                     continue
+                # find zero-based read pos of base aligned to ref base one before mononuc:
                 readstart = find_readpos_in_pairs(pairs, int(start)-1)
-                readend = find_readpos_in_pairs(pairs, int(end)+1)
+                # find zero-based read pos of base aligned to ref base one after mononuc:
+                readend = find_readpos_in_pairs(pairs, int(end))
                 if readstart is not None and readend is not None:
                     queryseq = queryseq.upper()
-                    alleleseq = queryseq[readstart+1:readend-1]
+                    alleleseq = queryseq[readstart+1:readend]
                     if p[repeatedbase].match(alleleseq):
                         numbases = len(alleleseq)
                         matchtype = "CORRECT"
@@ -185,54 +187,84 @@ def assess_mononuc_read_coverage(align_obj, mononucbedfile, outputdict, bedinter
                         mononucdict[runlength][numbases][matchtype] = mononucdict[runlength][numbases][matchtype] + 1
                 else:
                     print(readname + " is unaligned at one endpoint!")
+                    if readstart is None:
+                        print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not have a start")
+                    if readend is None:
+                        print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not have a end")
 
             mononucline = mfh.readline()
 
     return mononucdict
 
-def find_readpos_in_pairs(pairs, pos):
+# "pairs" is a structure created by pysam for an alignment, and contains a list
+#   of tuples "consisting of the 0-based offset from the start of the read 
+#   sequence followed by the 0-based reference position
+#
+# This routine searches the list of tuples for the one corresponding to the 
+#   desired reference position ("pos"), and returns the read position
+#   for that tuple, assuming it exists
+#
+# Why would a tuple have a ref position of "None"? These tuples are insertions
+#   in the read sequence (and deletions from the reference have read pos of 
+#   None). In the case of deletions from the reference, the "ifnone" argument
+#   can tell the routine whether to report the read position that is one to 
+#   the left of the deleted ref location ("lower") or one to the right ("higher")
+#
+# Note: this routine takes a *zero-based* position as its "pos" argument!
+#
+def find_readpos_in_pairs(pairs, pos, ifnone="lower"):
+    # number of tuples:
     alignlength = len(pairs)
-    low = 0
-    high = alignlength - 1
+    ilow = 0
+    ihigh = alignlength - 1
 
-    hiref = pairs[high][1]
-    while hiref is None and high > 0:
-        high = high - 1
-        hiref = pairs[high][1]
-    lowref = pairs[low][1]
-    while lowref is None and low < len(pairs):
-        low = low + 1
-        lowref = pairs[low][1]
+    hiref = pairs[ihigh][1]
+    while hiref is None and ihigh > 0:
+        ihigh = ihigh - 1
+        hiref = pairs[ihigh][1]
+    lowref = pairs[ilow][1]
+    while lowref is None and ilow < len(pairs):
+        ilow = ilow + 1
+        lowref = pairs[ilow][1]
 
-    if lowref is None or hiref is None or lowref > pos or hiref < pos:
+    # these shouldn't really happen
+    if lowref is None or hiref is None or lowref > pos or hiref < pos or lowref > hiref:
         return None
 
-    while high > low and hiref >= pos and lowref <= pos:
-        mid = int((low + high)/2)
-        if random.random() >= 0.5:
-            mid = mid + 1
-        himid = mid
-        lowmid = mid
-        while himid < high and pairs[himid][1] is None:
-            himid = himid + 1
-        while lowmid > low and pairs[lowmid][1] is None:
-            lowmid = lowmid - 1
-        if pairs[lowmid][1] is None or pairs[himid][1] is None:
+    # need to be careful here to avoid an infinite loop:
+    lastimid = None
+    while ihigh - 1 > ilow and hiref >= pos and lowref <= pos:
+        imid = int((ilow + ihigh)/2)
+        midref = pairs[imid][1]
+        #print("Pos: " + str(pos) + " (" + str(lowref) + "/" + str(hiref) + ") " + str(imid) + "/" + str(ilow) + "/" + str(ihigh))
+        # if imid tuple has an inserted sequence
+        while midref is None:
+            if ifnone == "lower":
+                imid = imid - 1
+            else:
+                imid = imid + 1
+            midref = pairs[imid][1]
+            if (ifnone == "lower" and imid <= ilow) or (ifnone=="higher" and imid >= ihigh):
+                break
+        if midref is None:
             return None
-        if abs(pairs[lowmid][1] - pos) < abs(pairs[himid][1] - pos):
-            mid = lowmid
-        else:
-            mid = himid
-        midval = pairs[mid][1]
-        #print(str(low) + " " + str(high) + " " + str(midval) + " " + str(pos) + " " + str(pairs[low][1]) + " " + str(pairs[high][1]) + " " + str(len(pairs)))
-        if midval == pos:
-            return pairs[mid][0] # might be None if nothing is aligned here
-        elif midval > pos:
-            high = mid
-        elif midval < pos:
-            low = mid
-        if (pairs[low][1] is not None and pairs[low][1] > pos) or (pairs[high][1] is not None and pairs[high][1] < pos):
+        if lastimid is not None and lastimid == imid:
+            for i in range(ilow, ihigh):
+                if pairs[i][1] is not None and pairs[i][1] == pos:
+                    return pairs[i][0]
             return None
+        
+        if midref == pos:
+            return pairs[imid][0] # might be None if nothing is aligned here
+        elif midref > pos:
+            ihigh = imid
+            hiref = pairs[ihigh][1]
+        elif midref < pos:
+            ilow = imid
+            lowref = pairs[ilow][1]
+        if (pairs[ilow][1] is not None and pairs[ilow][1] > pos) or (pairs[ihigh][1] is not None and pairs[ihigh][1] < pos):
+            return None
+        lastimid = imid
 
     return None
 

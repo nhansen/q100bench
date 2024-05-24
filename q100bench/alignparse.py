@@ -138,7 +138,7 @@ def retrieve_align_data(align)->list:
 
 # query start and query end are the lower and higher endpoints of the query seq in query coordinates (1-based)
 # regardless of orientation of the alignment
-def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, chromhetsites:dict, hetsitealleles:dict, widen=True)->list:
+def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, chromhetsites={}, hetsitealleles={}, widen=True)->list:
 
     # coordinates are all one-based, with start at beginning of *original* sequence (not left end of the alignment)
     #print("In align_variants with " + query + ":" + str(querystart) + "-" + str(queryend) + " " + ref + ":" + str(refstart) + "-" + str(refend) + "/" + strand)
