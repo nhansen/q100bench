@@ -459,23 +459,25 @@ def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
         qvwithphaseerrors = 'NA'
 
     snvtypestring = ""
+    totaltypesnverrors = 0
     for errortype in sorted(benchmark_stats["singlebasecounts"].keys()):
         typeerrors = benchmark_stats["singlebasecounts"][errortype]
         snvtypeerrorspermb = typeerrors/totalassemblybasesinaligns*1000000
         snvtypestring = snvtypestring + errortype + "\t" + str(typeerrors) + "\t" + str(snvtypeerrorspermb) + "\n"
-        totalsnverrors = totalsnverrors + typeerrors
-    snverrorspermb = int(totalsnverrors/totalassemblybasesinaligns*1000000)
+        totaltypesnverrors = totaltypesnverrors + typeerrors
+    snverrorspermb = int(totaltypesnverrors/totalassemblybasesinaligns*1000000)
     
     with open(bedfiles["snvstatsfile"], "w") as sfh:
         sfh.write(snvtypestring)
 
     indellengthstring = ""
+    totalhistindelerrors = 0
     for indellength in sorted(benchmark_stats["indellengthcounts"].keys()):
         indelcount = benchmark_stats["indellengthcounts"][indellength]
         indelerrorspermb = indelcount/totalassemblybasesinaligns*1000000
         indellengthstring = indellengthstring + str(indellength) + "\t" + str(indelcount) + "\t" + str(indelerrorspermb) + "\n"
-        totalindelerrors = totalindelerrors + indelcount
-    indelerrorspermb = int(totalindelerrors/totalassemblybasesinaligns*1000000)
+        totalhistindelerrors = totalhistindelerrors + indelcount
+    indelerrorspermb = int(totalhistindelerrors/totalassemblybasesinaligns*1000000)
 
     with open(bedfiles["indelstatsfile"], "w") as ifh:
         ifh.write(indellengthstring)
@@ -602,29 +604,48 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
                 numcorrect = 0
                 if "CORRECT" in stats[mononuclength][readmononuclength].keys():
                     numcorrect = stats[mononuclength][readmononuclength]["CORRECT"]
-                    lengthcomposition[mononuclength]['CORRECT'] = lengthcomposition[mononuclength]['CORRECT'] + 1
+                    lengthcomposition[mononuclength]['CORRECT'] = lengthcomposition[mononuclength]['CORRECT'] + numcorrect
                 numhetallele = 0
                 if "HET" in stats[mononuclength][readmononuclength].keys():
                     numhetallele = stats[mononuclength][readmononuclength]["HET"]
-                    lengthcomposition[mononuclength]['HET'] = lengthcomposition[mononuclength]['HET'] + 1
+                    lengthcomposition[mononuclength]['HET'] = lengthcomposition[mononuclength]['HET'] + numhetallele
                 numerror = 0
                 if "ERROR" in stats[mononuclength][readmononuclength].keys():
                     numerror = stats[mononuclength][readmononuclength]["ERROR"]
                     if readmononuclength > mononuclength:
-                        lengthcomposition[mononuclength]['INSERROR'] = lengthcomposition[mononuclength]['INSERROR'] + 1
+                        lengthcomposition[mononuclength]['INSERROR'] = lengthcomposition[mononuclength]['INSERROR'] + numerror
                     elif readmononuclength < mononuclength:
-                        lengthcomposition[mononuclength]['DELERROR'] = lengthcomposition[mononuclength]['DELERROR'] + 1
+                        lengthcomposition[mononuclength]['DELERROR'] = lengthcomposition[mononuclength]['DELERROR'] + numerror
                 numcomplexallele = 0
                 if "COMPLEX" in stats[mononuclength][readmononuclength].keys():
                     numcomplexallele = stats[mononuclength][readmononuclength]["COMPLEX"]
-                    lengthcomposition[mononuclength]['COMPLEX'] = lengthcomposition[mononuclength]['COMPLEX'] + 1
+                    lengthcomposition[mononuclength]['COMPLEX'] = lengthcomposition[mononuclength]['COMPLEX'] + numcomplexallele
                 msfh.write(str(mononuclength) + "\t" + str(readmononuclength) + "\t" + str(numcorrect) + "\t" + str(numhetallele) + "\t" + str(numerror) + "\t" + str(numcomplexallele) + "\n")
 
     mononuccompfile = outputfiles["mononuccompositionfile"]
+    mononucoverviewfile = outputfiles["mononucoverviewfile"]
+    totalcorrect = 0
+    totalerror = 0
+    totalcomplex = 0
+    totalinsertions = 0
+    totaldeletions = 0
     with open(mononuccompfile, "w") as mcfh:
         mcfh.write("BenchmarkLength\tNumCorrect\tNumHetAllele\tNumInsError\tNumDelError\tNumComplex\n")
         for mononuclength in sorted(stats.keys()):
             mcfh.write(str(mononuclength) + "\t" + str(lengthcomposition[mononuclength]['CORRECT']) + "\t" + str(lengthcomposition[mononuclength]['HET']) + "\t" + str(lengthcomposition[mononuclength]['INSERROR']) + "\t" + str(lengthcomposition[mononuclength]['DELERROR']) + "\t" + str(lengthcomposition[mononuclength]['COMPLEX']) + "\n")
+            totalcorrect = totalcorrect + lengthcomposition[mononuclength]['CORRECT']
+            totalerror = totalerror + lengthcomposition[mononuclength]['INSERROR'] + lengthcomposition[mononuclength]['DELERROR']
+            totalcomplex = totalcomplex + lengthcomposition[mononuclength]['COMPLEX']
+            totalinsertions = totalinsertions + lengthcomposition[mononuclength]['INSERROR']
+            totaldeletions = totaldeletions + lengthcomposition[mononuclength]['DELERROR']
+
+    with open(mononucoverviewfile, "w") as mofh:
+        noncomplexaccuracy = int(totalcorrect/(totalcorrect + totalerror)*1000)/10
+        accuracywithcomplex = int(totalcorrect/(totalcorrect + totalerror + totalcomplex)*1000)/10
+        overcallundercallratio = int(100*totalinsertions/totaldeletions)/100
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (not counting read alleles that match the alternate haplotype or are complex): " + str(noncomplexaccuracy) + "\n")
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex): " + str(accuracywithcomplex) + "\n")
+        mofh.write("Ratio of overcalled to undercalled homopolymer runs: " + str(overcallundercallratio) + "\n")
             
 
 

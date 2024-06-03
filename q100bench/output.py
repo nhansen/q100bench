@@ -50,6 +50,7 @@ def name_read_stats_files(args, outputdir:str)->dict:
     files["mononuchistfile"] = outputdir + "/" + args.readsetname + ".mononuchist.txt"
     files["mononuccompositionfile"] = outputdir + "/" + args.readsetname + ".mononuccomposition.txt"
     files["includedmononucfile"] = outputdir + "/" + args.readsetname + ".includedmononucs.txt"
+    files["mononucoverviewfile"] = outputdir + "/" + args.readsetname + ".mononucgeneralstats.txt"
     files["readerrorfile"] = outputdir + "/" + args.readsetname + ".readerrors.txt"
     files["errorstatsfile"] = outputdir + "/" + args.readsetname + ".generalstats.txt"
     files["snvstatsfile"] = outputdir + "/" + args.readsetname + ".singlenucerrorstats.txt"
