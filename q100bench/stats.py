@@ -401,7 +401,7 @@ def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
         errorline = vfh.readline()
         while errorline:
             errorline = errorline.rstrip()
-            [chrom, start, end, name, score, strand, widestart, wideend, color, errortype, varname] = errorline.split("\t")
+            [chrom, start, end, name, score, strand, widestart, wideend, color, errortype, vartype, varname] = errorline.split("\t")
             namefields = name.split("_")
             refallele = namefields[-2]
             altallele = namefields[-1]
@@ -409,7 +409,8 @@ def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
             altallelelength = len(altallele) # these lengths are wrong when allele is "*"--should replace
 
             totalerrors = totalerrors + 1
-            if refallele == "*" or altallele == "*" or refallelelength != altallelelength:
+            #if refallele == "*" or altallele == "*" or refallelelength != altallelelength:
+            if vartype == 'INDEL':
                 totalindelerrors = totalindelerrors + 1
             else:
                 totalsnverrors = totalsnverrors + 1
@@ -421,7 +422,7 @@ def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
                     totalphasingsnverrors = totalphasingsnverrors + 1
             elif errortype == "CONSENSUS":
                 totalconsensuserrors = totalconsensuserrors + 1
-                if refallele == "*" or altallele == "*" or refallelelength != altallelelength:
+                if vartype == 'INDEL':
                     totalconsensusindelerrors = totalconsensusindelerrors + 1
                 else:
                     totalconsensussnverrors = totalconsensussnverrors + 1
@@ -446,12 +447,12 @@ def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
 
     if consensuserrorrate != "NA":
         if consensuserrorrate > 0:
-            consensusqv = int(-10 * math.log(consensuserrorrate, 10))
+            consensusqv = int(-10 * math.log(consensuserrorrate, 10) + 0.5)
         else:
             consensusqv = 'Inf'
 
         if consensuserrorrate + phaseerrorrate > 0:
-            qvwithphaseerrors = int(-10 * math.log(consensuserrorrate + phaseerrorrate, 10))
+            qvwithphaseerrors = int(-10 * math.log(consensuserrorrate + phaseerrorrate, 10) + 0.5)
         else:
             qvwithphaseerrors = 'Inf'
     else:
@@ -599,7 +600,7 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
     with open(histogramfile, "w") as msfh:
         msfh.write("BenchmarkLength\tReadLength\tNumCorrect\tNumHetAllele\tNumError\tNumComplex\n")
         for mononuclength in sorted(stats.keys()):
-            lengthcomposition[mononuclength] = {'CORRECT':0, 'HET':0, 'INSERROR':0, 'DELERROR':0, 'COMPLEX':0}
+            lengthcomposition[mononuclength] = {'CORRECT':0, 'HET':0, 'INSERROR':0, 'DELERROR':0, 'COMPLEX':0, 'CLIPPED':0}
             for readmononuclength in sorted(stats[mononuclength].keys()):
                 numcorrect = 0
                 if "CORRECT" in stats[mononuclength][readmononuclength].keys():
@@ -620,6 +621,9 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
                 if "COMPLEX" in stats[mononuclength][readmononuclength].keys():
                     numcomplexallele = stats[mononuclength][readmononuclength]["COMPLEX"]
                     lengthcomposition[mononuclength]['COMPLEX'] = lengthcomposition[mononuclength]['COMPLEX'] + numcomplexallele
+                if "CLIPPED" in stats[mononuclength][readmononuclength].keys():
+                    numclippedallele = stats[mononuclength][readmononuclength]["CLIPPED"]
+                    lengthcomposition[mononuclength]['CLIPPED'] = lengthcomposition[mononuclength]['CLIPPED'] + numclippedallele
                 msfh.write(str(mononuclength) + "\t" + str(readmononuclength) + "\t" + str(numcorrect) + "\t" + str(numhetallele) + "\t" + str(numerror) + "\t" + str(numcomplexallele) + "\n")
 
     mononuccompfile = outputfiles["mononuccompositionfile"]
@@ -629,6 +633,7 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
     totalcomplex = 0
     totalinsertions = 0
     totaldeletions = 0
+    totalclipped = 0
     with open(mononuccompfile, "w") as mcfh:
         mcfh.write("BenchmarkLength\tNumCorrect\tNumHetAllele\tNumInsError\tNumDelError\tNumComplex\n")
         for mononuclength in sorted(stats.keys()):
@@ -636,15 +641,20 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
             totalcorrect = totalcorrect + lengthcomposition[mononuclength]['CORRECT']
             totalerror = totalerror + lengthcomposition[mononuclength]['INSERROR'] + lengthcomposition[mononuclength]['DELERROR']
             totalcomplex = totalcomplex + lengthcomposition[mononuclength]['COMPLEX']
+            totalclipped = totalcomplex + lengthcomposition[mononuclength]['CLIPPED']
             totalinsertions = totalinsertions + lengthcomposition[mononuclength]['INSERROR']
             totaldeletions = totaldeletions + lengthcomposition[mononuclength]['DELERROR']
 
     with open(mononucoverviewfile, "w") as mofh:
         noncomplexaccuracy = int(totalcorrect/(totalcorrect + totalerror)*1000)/10
         accuracywithcomplex = int(totalcorrect/(totalcorrect + totalerror + totalcomplex)*1000)/10
+        accuracywithclipped = int(totalcorrect/(totalcorrect + totalerror + totalclipped)*1000)/10
+        accuracywithcomplexandclipped = int(totalcorrect/(totalcorrect + totalerror + totalcomplex + totalclipped)*1000)/10
         overcallundercallratio = int(100*totalinsertions/totaldeletions)/100
         mofh.write("Accuracy of homopolymer runs of 10 or more bases (not counting read alleles that match the alternate haplotype or are complex): " + str(noncomplexaccuracy) + "\n")
         mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex): " + str(accuracywithcomplex) + "\n")
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including clipped): " + str(accuracywithclipped) + "\n")
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex and clipped): " + str(accuracywithcomplexandclipped) + "\n")
         mofh.write("Ratio of overcalled to undercalled homopolymer runs: " + str(overcallundercallratio) + "\n")
             
 

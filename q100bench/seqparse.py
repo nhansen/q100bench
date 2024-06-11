@@ -1,11 +1,9 @@
 import re
 import pysam
 import pybedtools
+from q100bench import bedtoolslib
 from collections import namedtuple
 import time
-
-# create namedtuple for bed intervals:
-bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
 
 def write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedobjects):
 
@@ -27,6 +25,7 @@ def write_excluded_bedfile(args, benchparams, outputfiles, bedobjects):
     elif len(allexcludedbedfiles) == 1:
         bedobjects["allexcludedregions"] = pybedtools.BedTool(allexcludedbedfiles[0])
     elif len(allexcludedbedfiles) > 1:
+        print("Merging " + str(allexcludedbedfiles))
         bedobjects["allexcludedregions"] = bedtoolslib.mergemultiplebedfiles(allexcludedbedfiles)
     bedobjects["allexcludedregions"].saveas(outputfiles["allexcludedbed"])
 
@@ -55,18 +54,19 @@ def find_all_ns(queryobj, args, outputfiles, bedobjects)->list:
     gapbedstring = ""
     contigbedstring = ""
     n_interval_dict = {}
-    # if an n interval file has been specified in the command line options, read it:
+    # if an n interval file has been specified in the command line options, read it into gapbedstring, and subtract from genome to get contigbedstring:
     if user_n_file:
-        nbed_line = ofh.readline()
-        while nbed_line:
-            [chrom, start, end, gapname] = nbed_line.split("\t")
-            gapbedstring += nbed_line
+        nbedobj = BedTool(user_n_file)
+        for n_interval in nbedobj:
+            chrom = n_interval.chrom
+            start = n_interval.start
+            end = n_interval.end
+            gapname = n_interval.name
+            gapbedstring += chrom + "\t" + str(start) + "\t" + str(end) + "\t" + gapname + "\n"
             if chrom in n_interval_dict.keys():
-                n_interval_dict[chrom].append(bedinterval(chrom=chrom, start=int(start), end=int(end), name=gapname, rest=""))
+                n_interval_dict[chrom].append(n_interval)
             else:
-                n_interval_dict[chrom] = [bedinterval(chrom=chrom, start=int(start), end=int(end), name=gapname, rest="")]
-            nbed_line = ofh.readline()
-        ofh.close()
+                n_interval_dict[chrom] = [n_interval]
         for ref in queryobj.references:
             if ref not in n_interval_dict.keys():
                 n_interval_dict[ref] = []
@@ -74,12 +74,12 @@ def find_all_ns(queryobj, args, outputfiles, bedobjects)->list:
             contigstart = 0
             for interval in n_interval_dict[ref]:
                 interval_name = ref + "." + str(contignum)
-                contigbedstring += chrom + "\t" + str(contigstart) + "\t" + str(interval.start) + "\t" + interval_name + "\t" + rest
+                contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(interval.start) + "\t" + interval_name + "\n"
                 contignum = contignum + 1
                 contigstart = interval.end
             refend = queryobj.get_reference_length(ref)
             interval_name = ref + "." + str(contignum)
-            contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + interval_name + "\t" + rest
+            contigbedstring += ref + "\t" + str(contigstart) + "\t" + str(refend) + "\t" + interval_name + "\n"
     else:
         for ref in queryobj.references:
             contignum = 1

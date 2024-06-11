@@ -23,10 +23,6 @@ def name_output_files(args, outputdir:str)->dict:
     files["truthcovered"] = outputdir + "/" + args.assembly + ".benchcovered." + args.benchmark + ".bed"
     files["testmatcovered"] = outputdir + "/testmatcovered." + args.assembly + ".bed"
     files["testpatcovered"] = outputdir + "/testpatcovered." + args.assembly + ".bed"
-    if args.variantfile is None:
-        files["variantbed"] = outputdir + "/" + args.assembly + ".variantsinaligns." + args.benchmark + ".bed"
-    else:
-        files["variantbed"] = args.variantfile
     files["generalstatsfile"] = outputdir + "/" + args.assembly + ".generalstats.txt"
     files["contiglengths"] = outputdir + "/" + args.assembly + ".contiglengths.txt"
     files["scaffoldlengths"] = outputdir + "/" + args.assembly + ".scaffoldlengths.txt"
@@ -37,6 +33,7 @@ def name_output_files(args, outputdir:str)->dict:
     files["coveredmononucsfile"] = outputdir + "/" + args.assembly + ".coveredmononucs." + args.benchmark + ".bed"
     files["mononucswithvariantsfile"] = outputdir + "/" + args.assembly + ".mononucswithvariants." + args.benchmark + ".bed"
     files["bencherrortypebed"] = outputdir + "/" + args.assembly + ".errortype." + args.benchmark + ".bed"
+    files["benchexcludederrortypebed"] = outputdir + "/" + args.assembly + ".excludederrors." + args.benchmark + ".bed"
     files["testerrortypebed"] = outputdir + "/errortype." + args.assembly + ".bed"
     files["coveredhetsitealleles"] = outputdir + "/" + args.benchmark + ".coveredhetalleles." + args.assembly + ".bed"
     files["snvstatsfile"] = outputdir + "/" + args.assembly + ".singlenucerrorstats.txt"

@@ -3,11 +3,12 @@ import sys
 import random
 import pybedtools
 from collections import namedtuple
+from q100bench import seqparse
 from q100bench import alignparse
 from q100bench import bedtoolslib
 
 # create namedtuple for bed intervals:
-bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
 
 def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparams, stats, args)->str:
 
@@ -19,11 +20,14 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
     testerrorfile = outputdict["testerrortypebed"]
     tfh = open(testerrorfile, "w")
 
+    excludederrorfile = outputdict["benchexcludederrortypebed"]
+    xfh = open(excludederrorfile, "w")
+
     with open(bencherrorfile, "w") as efh:
         for variant in variants:
             namefields = variant.name.split("_")
             numfields = len(namefields)
-            contigname = "_".join(namefields[0:numfields-5])
+            contigname = "_".join(namefields[0:numfields-4])
             pos = int(namefields[-4])
             refallele = namefields[-3]
             altallele = namefields[-2]
@@ -31,6 +35,7 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
                 alignstrand = '+'
             else:
                 alignstrand = '-'
+            print("Splitting variant name " + variant.name + " and found contigname " + contigname)
             varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
 
             if varname in hetsites.keys():
@@ -39,16 +44,20 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
             else:
                 errortype = 'CONSENSUS'
                 errortypecolor = '0,0,255'
-    
-            efh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.name + "\n")
-            tfh.write(contigname + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + variant.name + "\t1000\t" + alignstrand + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortypecolor + "\t" + errortype + "\t" + varname + "\n")
+
+            if variant.excluded:
+                xfh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+            else:
+                efh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+
+            tfh.write(contigname + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + variant.name + "\t1000\t" + alignstrand + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + varname + "\n")
             stats["totalerrorsinaligns"] = stats["totalerrorsinaligns"] + 1
                 
             # tally statistics for non-phasing errors:
 
-            if errortype != "CONSENSUS":
+            if variant.excluded or errortype != "CONSENSUS":
                 continue
-            if refallele != "*" and altallele != "*" and len(refallele) == 1 and len(altallele) == 1:
+            if variant.vartype == "SNV":
                 snvkey = refallele + "_" + altallele
                 if snvkey in stats["singlebasecounts"]:
                     stats["singlebasecounts"][snvkey] = stats["singlebasecounts"][snvkey] + 1
@@ -79,7 +88,7 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
         mononucline = mfh.readline()
         while mononucline:
             mononucline = mononucline.rstrip()
-            [chrom, start, end, name, score, strand, widestart, wideend, color, chrom_b, start_b, end_b, variant_name, score_b, strand_b, widestart_b, wideend_b, color_b, variant_type, queryvariantname] = mononucline.split("\t")
+            [chrom, start, end, name, score, strand, widestart, wideend, color, chrom_b, start_b, end_b, variant_name, score_b, strand_b, widestart_b, wideend_b, color_b, error_type, variant_type, queryvariantname] = mononucline.split("\t")
             runlength = int(end) - int(start)
             namefields = name.split("_")
             repeatedbase = namefields[-1]
@@ -92,23 +101,23 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
                 altbases = variantnamefields[-1]
                 if refbases == "*" and p[repeatedbase].match(altbases): # increased length
                     newlength = runlength + len(altbases)
-                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
-                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + variant_type + "\n")
+                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':error_type}
+                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + error_type + "\n")
                 elif altbases == "*" and p[repeatedbase].match(refbases): # decreased length
                     newlength = runlength - len(refbases)
-                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
-                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + variant_type + "\n")
+                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':error_type}
+                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + error_type + "\n")
                 elif p[repeatedbase].match(refbases) and p[repeatedbase].match(altbases): # expanded notation
                     newlength = len(altbases)
                     reflength = len(refbases)
                     if reflength != runlength:
                         print("Mononuc var reflength doesn\'t match benchmark run length at " + chrom + ":" + str(start) + "-" + str(end), file=sys.stderr)
-                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + variant_type + "\n")
-                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
+                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + error_type + "\n")
+                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':error_type}
                 else: # complex error
                     newlength = -1
-                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':variant_type}
-                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + variant_type + "\n")
+                    result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':error_type}
+                    sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + error_type + "\n")
 
             mononucline = mfh.readline()
 
@@ -153,7 +162,7 @@ def assess_mononuc_read_coverage(align_obj, mononucbedfile, outputdict, bedinter
                     continue
                 readname = readalign.query_name
                 if readalign.reference_start >= int(start) or readalign.reference_end <= int(end):
-                    print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not span " + chrom + ":" + start + "-" + end)
+                    #print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not span " + chrom + ":" + start + "-" + end)
                     continue
                 pairs = readalign.get_aligned_pairs()
                 if len(pairs) == 0:
@@ -353,7 +362,14 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                     if errortype == 'ERROR':
                         stats["totalerrorsinaligns"] = stats["totalerrorsinaligns"] + 1
                         if refallele != "*" and altallele != "*" and len(refallele) == 1 and len(altallele) == 1:
-                            snvkey = refallele + "_" + altallele
+                            if alignstrand == "+":
+                                readrefallele = refallele
+                                readaltallele = altallele
+                            else:
+                                readrefallele = seqparse.revcomp(refallele)
+                                readaltallele = seqparse.revcomp(altallele)
+
+                            snvkey = readrefallele + "_" + readaltallele
                             if snvkey in stats["singlebasecounts"]:
                                 stats["singlebasecounts"][snvkey] = stats["singlebasecounts"][snvkey] + 1
                             else:

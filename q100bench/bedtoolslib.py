@@ -27,12 +27,12 @@ def mergeintervals(intervals):
 
 def mergemultiplebedfiles(bedfilelist:list):
 
-    if len(bedfilelist < 2):
+    if len(bedfilelist) < 2:
         print("Cannot call mergemultiplebedfiles on less than two bed files!")
         exit(1)
 
     firstbedtool = pybedtools.bedtool.BedTool(bedfilelist[0])
-    allbedtools = firstbedtool.cat(bedfilelist[1:])
+    allbedtools = firstbedtool.cat(bedfilelist[1])
 
     return allbedtools
 

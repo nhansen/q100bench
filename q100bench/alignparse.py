@@ -8,11 +8,11 @@ from q100bench import bedtoolslib
 from q100bench import output
 
 # create namedtuple for bed intervals:
-bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
 
 # query start is always less than query end regardless of strand. query left always corresponds to ref start, 
 # and so will be greater than query right when strand is reversed--all four are 1-based
-def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, testpatbed, truthbed, variantbed, hetallelebed, args):
+def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, testpatbed, truthbed, hetallelebed, excludedbedobj, args):
 
     refcoveredstring = ""
     querycoveredstring = ""
@@ -38,6 +38,8 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
                 refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
                 if user_variantfile is None:
                     variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, True))
+        # mark variants that are in excluded regions:
+        variants = exclude_variants(variants, excludedbedobj)
     else:
         for pafdict in pafaligns:
             # all start/endpoints are 1-based
@@ -83,18 +85,13 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
 
     phasing.write_hetallele_bed(hetsitealleles, hetallelebed)
 
-    if user_variantfile is None:
-        with open(variantbed, "w") as vb:
-            for varianttuple in sorted(variants, key=lambda h: (h.chrom, h.start, h.end)):
-                vb.write(varianttuple.chrom + "\t" + str(varianttuple.start) + "\t" + str(varianttuple.end) + "\t" + varianttuple.name + "\n")
-
     if user_variantfile is not None:
         with open(user_variantfile, "r") as vh:
             variantline = vh.readline()
             while variantline:
                 variantline = variantline.rstrip()
                 [chrom, start, end, name] = variantline.split("\t")
-                variants.append(bedinterval(chrom=chrom, start=int(start), end=int(end), name=name, rest=''))
+                variants.append(varianttuple(chrom=chrom, start=int(start), end=int(end), name=name))
                 variantline = vh.readline()
 
     return [refcoveredbed, querycoveredbed, variants, hetsitealleles]
@@ -191,8 +188,8 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     querycoordinate = queryend - querypos
                 if refseq[refpos] != queryseq[querypos] and refseq[refpos] != "N" and queryseq[querypos] != "N":
                     variantname=query+"_"+str(querycoordinate)+"_"+refseq[refpos]+"_"+queryseq[querypos]+"_"+strand # query's 1-based position, ref base, query base (comp if rev strand), strand
-                    additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart-1) + "\t" + str(refpos+refstart) + "\t0,0,0\t" + alignstring
-                    variantlist.append(bedinterval(chrom=ref, start=refpos+refstart-1, end=refpos+refstart, name=variantname, rest=additionalfields))
+                    #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart-1) + "\t" + str(refpos+refstart) + "\t0,0,0\t" + alignstring
+                    variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-1, end=refpos+refstart, name=variantname, vartype='SNV', excluded=False))
                 query_positions.append(querypos)
 
         if op in [2, 3]: # deletions
@@ -225,8 +222,8 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
         
             if not (matchns.match(queryallele) or matchns.match(refallele) or matchns.match(querysurroundingseq)):
                 variantname=query+"_"+str(querycoordinate+1)+"_"+refallele+"_"+queryallele+"_"+strand # positions of insertions are positions to the left of first inserted base
-                additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+oplength+extend) + "\t0,0,0\t" + alignstring
-                variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+oplength+extend, name=variantname, rest=additionalfields ))
+                #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+oplength+extend) + "\t0,0,0\t" + alignstring
+                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart, end=refpos+refstart+oplength+extend, name=variantname, vartype='INDEL', excluded=False ))
 
         if op == 1: # insertion
             refpos = refcurrentoffset-1;
@@ -259,8 +256,8 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             
             if not (matchns.match(queryallele) or matchns.match(refallele) or matchns.match(refsurroundingseq)):
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
-                additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extend) + "\t0,0,0\t" + alignstring
-                variantlist.append(bedinterval(chrom=ref, start=refpos+refstart, end=refpos+refstart+extend, name=variantname, rest=additionalfields ))
+                #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extend) + "\t0,0,0\t" + alignstring
+                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart, end=refpos+refstart+extend, name=variantname, vartype='INDEL', excluded=False ))
 
         # advance current positions: cases where reference coord advances (MDN=X):
         if op in [0, 2, 3, 7, 8]:
@@ -311,6 +308,32 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             hetsitealleles[hetname] = {'name':hetname, 'ref':ref, 'refstart':hetstart, 'refend':hetend, 'allele':queryallele, 'query':query, 'start':querystartcoord, 'end':queryendcoord, 'chrom':query}
 
     return variantlist
+
+def exclude_variants(variants:list, excludedregionsobj:pybedtools.BedTool)->list:
+    # create bedintervals for variants:
+    variantbedstring = ""
+    for variant in variants:
+        chrom = variant.chrom
+        start = variant.start
+        end = variant.end
+        name = variant.name
+
+        variantbedstring = variantbedstring + chrom + "\t" + str(start) + "\t" + str(end) + "\t" + name + "\n"
+
+    variantbedobj = pybedtools.BedTool(variantbedstring, from_string=True)
+    excludedvariants = bedtoolslib.intersectintervals(variantbedobj, excludedregionsobj, wa=True)
+    excludeddict = {}
+    for excludedvariant in excludedvariants:
+        excludeddict[excludedvariant.name] = True
+
+    newvariants = []
+    for variant in variants:
+        if variant.name in excludeddict.keys():
+            newvariants.append(varianttuple(chrom=variant.chrom, start=variant.start, end=variant.end, name=variant.name, vartype=variant.vartype, excluded = True))
+        else:
+            newvariants.append(variant)
+
+    return newvariants
 
 def read_paf_aligns(paffile:str, mintargetlength=0)->list:
 
@@ -377,7 +400,7 @@ def read_bam_aligns(bamobj, mintargetlength=0)->list:
 # this routine assumes query start > query end for reverse strand alignments
 def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedobjects, benchmark_stats, args):
 
-    # create a "clustercoverage" dictionary that will contain each chromosomes number of clusters and bases covered
+    # create a "clustercoverage" dictionary that will contain each chromosome's number of clusters and bases covered
     benchmark_stats["clustercoverage"] = {}
     benchmark_stats["alignclusters"] = {}
     benchmark_stats["numnonexcludedbases"] = {}
@@ -389,10 +412,11 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
     output.create_output_directory(outputfiles["alignplotdir"])
     alignplotprefix = outputfiles["alignplotprefix"]
 
-    # ref nonexcluded dict:
+    # calculate number of non-excluded bases for each ref entry:
     for ref in refobj.references:
         benchmark_stats["numnonexcludedbases"][ref] = refobj.get_reference_length(ref)
 
+    # since allexcludedregions bed object is merged,can subtract out excluded bases interval by interval
     for interval in bedobjects["allexcludedregions"]:
         ref = interval.chrom
         benchmark_stats["numnonexcludedbases"][ref] = benchmark_stats["numnonexcludedbases"][ref] - len(interval)
@@ -438,8 +462,11 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
             bedtool = pybedtools.BedTool(clusterbedstring, from_string = True)
             nonexcludedbedtool = bedtoolslib.intersectintervals(bedtool, bedobjects["allexcludedregions"], v=True)
             cluster["nonexcludedcoveredbases"] = bedtoolslib.bedsum(nonexcludedbedtool)
-            mergednonexcludedbedtool = bedtoolslib.mergeintervals(nonexcludedbedtool)
-            cluster["nrnonexcludedcoveredbases"] = bedtoolslib.bedsum(mergednonexcludedbedtool)
+            if cluster["nonexcludedcoveredbases"] > 0:
+                mergednonexcludedbedtool = bedtoolslib.mergeintervals(nonexcludedbedtool)
+                cluster["nrnonexcludedcoveredbases"] = bedtoolslib.bedsum(mergednonexcludedbedtool)
+            else:
+                cluster["nrnonexcludedcoveredbases"] = 0
 
         # calculate how many clusters needed to cover 95% of ref:
         totalnonexcludedcovered = 0

@@ -20,7 +20,7 @@ from q100bench import mummermethods
 from q100bench import plots
 
 # create namedtuple for bed intervals:
-bedinterval = namedtuple('bedinterval', ['chrom', 'start', 'end', 'name', 'rest']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
 
 
 def check_for_bedtools():
@@ -79,8 +79,8 @@ def read_config_data(args)->dict:
 
     configvals = {}
     if not configpath.exists():
-        print("Using resource locations from default config file")
         template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
+        print("Using resource locations from default config file " + str(template_res))
         with importlib.resources.as_file(template_res) as configfile:
             with open(configfile, "r") as cr:
                 configline = cr.readline()
@@ -128,6 +128,7 @@ def main() -> None:
 
     print("Writing bed files for excluded regions, test assembly scaffold spans, lengths, N stretches, and contigs (ignoring stretches of less than " + str(args.minns) + " Ns)")
     bedregiondict = {}
+    # merged excluded regions are saved as BedTool object "allexcludedregions" in bedregiondict here:
     seqparse.write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedregiondict)
    
     # read in alignments from BAM or PAF format, filtering out secondaries and finding the longest increasing sequence along the reference:
@@ -158,7 +159,7 @@ def main() -> None:
        hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
        hetarrays = phasing.sort_chrom_hetsite_arrays(hetsites)
        
-       [refcoveredbed, querycoveredbed, variants, hetsitealleles] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["variantbed"], outputfiles["coveredhetsitealleles"], args)
+       [refcoveredbed, querycoveredbed, variants, hetsitealleles] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["coveredhetsitealleles"], bedregiondict["allexcludedregions"], args)
 
        # create merged unique outputfiles:
        [mergedtruthcoveredbed, outputfiles["mergedtruthcovered"]] = bedtoolslib.mergebed(outputfiles["truthcovered"])
