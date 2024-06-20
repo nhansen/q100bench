@@ -1,9 +1,12 @@
 import re
 import pysam
 import pybedtools
+import logging
 from collections import namedtuple
 from q100bench import seqparse
 from q100bench import phasing
+
+logger = logging.getLogger(__name__)
 
 # This routine, ported from mummer's delta-filter C++ routines "flagQLIS" and "flagRLIS", finds the longest
 # increasing sequence of alignments along a target- or query-sorted list of alignments, using the
@@ -107,7 +110,6 @@ def filter_aligns(alignlist:list, sorttype="target", maxoverlap=0.95):
 
         i = allbest[bestpick]
         while i != -1:
-            #print(lis[i]["align"]["target"] + "\t" + str(lis[i]["align"]["targetstart"]) + "\t" + str(lis[i]["align"]["targetend"]) + "\t" + lis[i]["align"]["query"] + "\t" + str(lis[i]["align"]["querylow"]) + "\t" + str(lis[i]["align"]["queryhigh"]) + "\t" + lis[i]["align"]["strand"] + "\t" + str(i))
             filteredaligns.insert(0, lis[i]["align"])
             i = lis[i]["from"]
 

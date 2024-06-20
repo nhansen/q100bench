@@ -1,10 +1,13 @@
 import shutil
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 def create_output_directory(directory)->None:
     #directory = args.prefix
     path = Path(directory)
-    print("Creating directory " + directory + " for output")
+    logger.info("Creating directory " + directory + " for output")
     path.mkdir(exist_ok=True)
 
     return path.as_posix()

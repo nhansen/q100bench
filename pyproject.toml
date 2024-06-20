@@ -32,6 +32,7 @@ license = {file = "LICENSE"}
 [project.scripts]
 q100bench = "q100bench.bench:main"
 gethets = "q100bench.gethets:main"
+readbench = "q100bench.readbench:main"
 
 [project.urls]
 "Homepage" = "https://github.com/nhansen/q100bench"

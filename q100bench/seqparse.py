@@ -1,9 +1,13 @@
 import re
 import pysam
 import pybedtools
+import logging
+from pathlib import Path
 from q100bench import bedtoolslib
 from collections import namedtuple
 import time
+
+logger = logging.getLogger(__name__)
 
 def write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedobjects):
 
@@ -17,15 +21,25 @@ def write_excluded_bedfile(args, benchparams, outputfiles, bedobjects):
     if args.excludefile is not None:
         allexcludedbedfiles.append(args.excludefile)
     if "excluderegions" in benchparams.keys():
-        allexcludedbedfiles.append(benchparams["excluderegions"])
+        configexcluderegions = benchparams["excluderegions"]
+        configexcludepath = Path(configexcluderegions)
+        if configexcludepath.is_file():
+            allexcludedbedfiles.append(configexcluderegions)
+        else:
+            logger.warning("Exclude file " + configexcluderegions + " does not exist so will not be used")
     if "nstretchregions" in benchparams.keys():
-        allexcludedbedfiles.append(benchparams["nstretchregions"])
+        nexcluderegions = benchparams["nstretchregions"]
+        nexcludepath = Path(nexcluderegions)
+        if nexcludepath.is_file():
+            allexcludedbedfiles.append(nexcluderegions)
+        else:
+            logger.warning("Benchmark N file " + nexcluderegions + " does not exist so will not be used")
     if len(allexcludedbedfiles) == 0:
         bedobjects["allexcludedregions"] = pybedtools.BedTool("", from_string = True)
     elif len(allexcludedbedfiles) == 1:
         bedobjects["allexcludedregions"] = pybedtools.BedTool(allexcludedbedfiles[0])
     elif len(allexcludedbedfiles) > 1:
-        print("Merging " + str(allexcludedbedfiles))
+        logger.info("Merging " + str(allexcludedbedfiles) + " to create a combined excluded regions file")
         bedobjects["allexcludedregions"] = bedtoolslib.mergemultiplebedfiles(allexcludedbedfiles)
     bedobjects["allexcludedregions"].saveas(outputfiles["allexcludedbed"])
 

@@ -5,6 +5,7 @@ import shutil
 import pysam
 import argparse
 import pybedtools
+import logging
 import importlib.resources
 from pathlib import Path
 from q100bench import errors
@@ -15,15 +16,11 @@ from q100bench import phasing
 from q100bench import stats
 from q100bench import plots
 
-#def check_for_bedtools():
-    #if shutil.which("bedtools") is None:
-        #sys.print("You don\'t seem to have bedtools in your path. Please install bedtools", file=sys.stderr)
-        #exit(1)
-    #return 0
+logger = logging.getLogger(__name__)
 
 def check_for_R():
     if shutil.which("Rscript") is None:
-        print("You don\'t seem to have Rscript in your path. Plots will not be generated", file=sys.stderr)
+        logger.warning("You don\'t seem to have Rscript in your path. Plots will not be generated")
         return 1
     return 0
 
@@ -49,6 +46,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('-R', '--readsetname', type=str, required=False, default="test", help='name of the assembly being tested--should be query sequence in bam file')
     parser.add_argument('-B', '--benchmark', type=str, required=False, default="truth", help='name of the assembly being used as a benchmark--should be the reference sequence in the bam file')
     parser.add_argument('-c', '--config', type=str, required=False, default="benchconfig.txt", help='path to a config file specifying locations of benchmark data files')
+    parser.add_argument('--debug', action='store_true', required=False, help='print verbose output to log file for debugging')
 
     return parser
 
@@ -68,7 +66,7 @@ def parse_arguments(args):
     args = parser.parse_args(args)
 
     if not args.bam:
-        sys.print("Must specify a bam file with --bam", file=sys.stderr)
+        logger.critical("Must specify a bam file with --bam")
         exit(1)
 
     return args
@@ -79,7 +77,7 @@ def read_config_data(args)->dict:
 
     configvals = {}
     if not configpath.exists():
-        print("Using resource locations from default config file")
+        logger.info("Using resource locations from default config file")
         template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
         with importlib.resources.as_file(template_res) as configfile:
             with open(configfile, "r") as cr:
@@ -93,7 +91,7 @@ def read_config_data(args)->dict:
                         configvals[key] = value
                     configline = cr.readline()
     else:
-        print("Using resource locations from " + configfile)
+        logger.info("Using resource locations from " + configfile)
         with open(configfile, "r") as cr:
             configline = cr.readline()
             while configline:
@@ -112,6 +110,16 @@ def main() -> None:
     args = parse_arguments(sys.argv[1:])
     #check_for_bedtools()
     no_rscript = check_for_R()
+    
+    if args.debug:
+        logging.basicConfig(filename=logfile, level=logging.DEBUG)
+        logger.info('Logging verbose output for debugging.')
+    else:
+        logging.basicConfig(filename=logfile, level=logging.INFO)
+
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT)
+
     outputdir = output.create_output_directory(args.prefix)
     benchparams = read_config_data(args)
 
@@ -119,9 +127,9 @@ def main() -> None:
     benchintervals = None
     if args.regions != "":
         benchintervals = pybedtools.bedtool.BedTool(args.regions)
-        print("Restricting evaluation to read sequence aligning to regions in " + args.regions)
+        logger.info("Restricting evaluation to read sequence aligning to regions in " + args.regions)
     else:
-        print(args)
+        logger.debug(args)
 
     alignobj = pysam.AlignmentFile(args.bam, "rb")
     refobj = pysam.FastaFile(args.reffasta)
@@ -130,26 +138,20 @@ def main() -> None:
 
     # evaluate mononucleotide runs:
     if not args.nomononucs:
-        print("Assessing accuracy of mononucleotide runs")
-        print(benchparams["mononucruns"])
-        print(outputfiles["mononucstatsfile"])
+        logger.info("Assessing accuracy of mononucleotide runs")
+        logger.debug(benchparams["mononucruns"])
+        logger.debug(outputfiles["mononucstatsfile"])
         mononucstats = errors.assess_mononuc_read_coverage(alignobj, benchparams["mononucruns"], outputfiles, benchintervals, hetsites, args)
         stats.write_read_mononuc_stats(mononucstats, outputfiles, args)
         plots.plot_read_mononuc_stats(args.readsetname, args.benchmark, outputdir)
     
     # evaluate errors within read alignments:
     if not args.nobaseerrors:
-        print("Assessing errors within read alignments")
-        print(outputfiles["readerrorfile"])
+        logger.info("Assessing errors within read alignments")
+        logger.debug(outputfiles["readerrorfile"])
         errorstats = errors.assess_read_align_errors(alignobj, refobj, outputfiles["readerrorfile"], benchintervals, hetsites, args)
         stats.write_read_error_summary(errorstats, outputfiles)
         plots.plot_read_error_stats(args.readsetname, args.benchmark, outputdir)
-
-    # plot alignment coverage across assembly and genome:
-    #if not no_rscript:
-    #    print("Creating plots")
-    #    if alignobj is not None:
-    #        plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
 
 
 if __name__ == "__main__":

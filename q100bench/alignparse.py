@@ -1,7 +1,9 @@
 import re
 import pysam
 import pybedtools
+import logging
 from collections import namedtuple
+from pathlib import Path
 from q100bench import seqparse
 from q100bench import phasing
 from q100bench import bedtoolslib
@@ -9,6 +11,8 @@ from q100bench import output
 
 # create namedtuple for bed intervals:
 varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
+
+logger = logging.getLogger(__name__)
 
 # query start is always less than query end regardless of strand. query left always corresponds to ref start, 
 # and so will be greater than query right when strand is reversed--all four are 1-based
@@ -46,7 +50,6 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
             query = pafdict['query']
             querystart = pafdict['querystart']
             queryend = pafdict['queryend']
-            #print(query + ":" + str(querystart) + "-" + str(queryend))
             if querystart < queryend:
                 queryleft = querystart
                 queryright = queryend
@@ -60,7 +63,6 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
 
             querynamestring = query + "." + str(querystart) + "." + str(queryend)
             refnamestring = ref + "." + str(refstart) + "." + str(refend) + "." + strand
-            #print(querynamestring + ", " + refnamestring)
             querycoveredstring += query + "\t" + str(queryleft - 1) + "\t" + str(queryright) + "\t" + refnamestring + "\n"
             refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
 
@@ -138,7 +140,6 @@ def retrieve_align_data(align)->list:
 def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, chromhetsites={}, hetsitealleles={}, widen=True)->list:
 
     # coordinates are all one-based, with start at beginning of *original* sequence (not left end of the alignment)
-    #print("In align_variants with " + query + ":" + str(querystart) + "-" + str(queryend) + " " + ref + ":" + str(refstart) + "-" + str(refend) + "/" + strand)
     variantlist = []
     coveredregionlist = []
     homozygousregionlist = []
@@ -270,7 +271,6 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
 
     numquerypositions = len(query_positions)
     refseqlength = len(refseq)
-    #print(str(numquerypositions) + " positions for " + str(refseqlength) + " bases")
 
     # use query positions to assess het alleles/covered regions:
     if ref in chromhetsites:
@@ -338,6 +338,12 @@ def exclude_variants(variants:list, excludedregionsobj:pybedtools.BedTool)->list
 def read_paf_aligns(paffile:str, mintargetlength=0)->list:
 
     alignlist = []
+    
+    paf = Path(paffile)
+    if not paf.is_file():
+        logger.critical("PAF file " + paffile + " must exist and be readable")
+        exit(1)
+
     with open(paffile, "r") as pfh:
         alignline = pfh.readline()
         while alignline:
@@ -346,7 +352,7 @@ def read_paf_aligns(paffile:str, mintargetlength=0)->list:
             if len(fields) >= 12:
                 [query, querylength, querystartzb, queryend, strand, target, targetlength, targetstartzb, targetend, resmatches, blocklength, mapqual] = fields[0:12]
             else:
-                sys.print("Input paf-file has fewer than 12 tab-delimited columns. Unable to process.")
+                logger.critical("Input paf-file has fewer than 12 tab-delimited columns. Unable to process.")
                 exit(1)
 
             #if len(fields) > 12 and len(list(filter(lambda x:'tp:A:S' in x, fields[12:]))) > 0:
@@ -360,7 +366,6 @@ def read_paf_aligns(paffile:str, mintargetlength=0)->list:
             targetalignlength = targetend - int(targetstartzb)
 
             if targetalignlength >= mintargetlength:
-                #print("Keeping paf entry " + target + ":" + targetstartzb + "-" + str(targetend))
                 if strand == "+":
                     alignlist.append({'query':query, 'querylength':int(querylength), 'querystart':querystart, 'queryend':queryend, 'queryalignlength':queryalignlength, 'strand':strand, 'target':target, 'targetlength':int(targetlength), 'targetstart':targetstart, 'targetend':targetend, 'targetalignlength':targetalignlength})
                 else:
@@ -432,7 +437,6 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
     # assess each benchmark entry, one by one
     for refentry in sorted(aligndict.keys()):
         refnelength = benchmark_stats["numnonexcludedbases"][refentry]
-        #print(refentry + " nonexcluded length " + str(refnelength))
         refalignclusters = []
         # sort alignments from longest (along the benchmark) to shortest:
         aligndict[refentry].sort(reverse=True, key=lambda align: align["targetalignlength"])
@@ -443,7 +447,6 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
             alignquery = refalign['query']
             alignquerystart = refalign['querystart']
             alignqueryend = refalign['queryend']
-            #print("Adding align " + str(alignrefstart) + " to " + str(alignrefend))
             add_align_to_clusters(refalign, refalignclusters, maxdistance)
 
         # split clusters that are separated along the target by more than maxdistance:
@@ -452,8 +455,6 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
         for cluster in sorted(refalignclusters, key=lambda c: c["aligns"][0]["targetstart"]):
             clusterquery = cluster["query"] 
             clusterslope = cluster["slope"]
-            #if clusterslope < 0:
-                #print("Cluster on " + refentry + " for query " + clusterquery + " from " + str(cluster["aligns"][0]["targetstart"]) + " (query " + str(cluster["aligns"][0]["querystart"]) + ") is reverse strand")
             clusterintercept = cluster["intercept"]
             clusterbedstring = ""
             for align in sorted(cluster["aligns"], key=lambda a: (a["targetstart"], a["targetend"])):

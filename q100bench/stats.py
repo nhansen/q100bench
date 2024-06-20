@@ -1,5 +1,8 @@
 import re
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 def write_general_assembly_stats(refobj, queryobj, contigregions, gapregions, outputfiles, args)->dict:
 
@@ -58,8 +61,10 @@ def write_general_assembly_stats(refobj, queryobj, contigregions, gapregions, ou
                 if cumscaffbases > 0.5*hap2totalbases and scaffold_hap2_ng50 == 0:
                     scaffold_hap2_ng50 = scafflength
                     scaffold_hap2_lg50 = numscaffs
-                scaffold_hap1_aung = scaffold_hap1_aung + scafflength*scafflength/hap1totalbases
-                scaffold_hap2_aung = scaffold_hap2_aung + scafflength*scafflength/hap2totalbases
+                if hap1totalbases > 0:
+                    scaffold_hap1_aung = scaffold_hap1_aung + scafflength*scafflength/hap1totalbases
+                if hap2totalbases:
+                    scaffold_hap2_aung = scaffold_hap2_aung + scafflength*scafflength/hap2totalbases
                 perctotallength = int(1000.0*cumscaffbases/avghaptotalbases + 0.5)/10.0
                 # At some point, may want to pull scaffold name into last field for use in annotating plots
                 sfh.write(str(perctotallength) + "\t" + str(scafflength) + "\t" + str(cumscaffbases) + "\tNA\n")
@@ -104,8 +109,10 @@ def write_general_assembly_stats(refobj, queryobj, contigregions, gapregions, ou
                 if cumcontigbases > 0.5*hap2totalbases and contig_hap2_ng50 == 0:
                     contig_hap2_ng50 = contigsize
                     contig_hap2_lg50 = numcontigs
-                contig_hap1_aung = contig_hap1_aung + contigsize*contigsize/hap1totalbases
-                contig_hap2_aung = contig_hap2_aung + contigsize*contigsize/hap2totalbases
+                if hap1totalbases > 0:
+                    contig_hap1_aung = contig_hap1_aung + contigsize*contigsize/hap1totalbases
+                if hap2totalbases > 0:
+                    contig_hap2_aung = contig_hap2_aung + contigsize*contigsize/hap2totalbases
                 perctotallength = int(1000.0*cumcontigbases/avghaptotalbases + 0.5)/10.0
                 cfh.write(str(perctotallength) + "\t" + str(contigsize) + "\t" + str(cumcontigbases) + "\tNA\n")
         
@@ -272,7 +279,7 @@ def write_aligned_cluster_stats(outputfiles:dict, bmstats:dict, args)->int:
                 if clusterhigh is None or align["targetend"] > clusterhigh:
                     clusterhigh = align["targetend"]
 
-            print(refentry + " cluster " + str(clusterlow) + "-" + str(clusterhigh))
+            logger.debug(refentry + " cluster " + str(clusterlow) + "-" + str(clusterhigh))
             cluster["spanlength"] = clusterhigh - clusterlow + 1
             cluster["refentry"] = refentry
             allclusters.append(cluster)
@@ -285,7 +292,7 @@ def write_aligned_cluster_stats(outputfiles:dict, bmstats:dict, args)->int:
             totallength = totallength + spanlength
             perctotallength = int(1000.0*totallength/avghaptotalbases + 0.5)/10.0
             refentry = cluster["refentry"]
-            print(str(spanlength) + "\t" + str(totallength) + "\t" + refentry)
+            logger.debug(str(spanlength) + "\t" + str(totallength) + "\t" + refentry)
             cfh.write(str(perctotallength) + "\t" + str(spanlength) + "\t" + str(totallength) + "\t" + refentry + "\n")
 
     return 0
@@ -523,13 +530,25 @@ def write_mononuc_stats(mononucstats:dict, bedfiles:dict, benchmark_stats:dict, 
     with open(generalstatsfile, "a") as gsfh:
         gsfh.write("\nMononucleotide run accuracy:\n\n")
         gsfh.write("Total number of true assembly mononucleotide runs of ten or more bases covered by " + args.assembly + " alignments: " + str(totalcoveredmononucs) + "\n")
-        perccorrect = round(100*totalcorrect/totalcoveredmononucs, 3)
+        if totalcoveredmononucs > 0:
+            perccorrect = round(100*totalcorrect/totalcoveredmononucs, 3)
+        else:
+            perccorrect = 'NA'
         gsfh.write("Number of mononucleotide runs correct in assembly: " + str(totalcorrect) + " (" + str(perccorrect) + "%)" + "\n")
-        percphaseswitch = round(100*totalphaseswitches/totalcoveredmononucs, 3)
+        if totalcoveredmononucs > 0:
+            percphaseswitch = round(100*totalphaseswitches/totalcoveredmononucs, 3)
+        else:
+            percphaseswitch = 'NA'
         gsfh.write("Number of mononucleotide runs with assembly alleles matching the alternate haplotype: " + str(totalphaseswitches) + " (" + str(percphaseswitch) + "%)" + "\n")
-        percwronglength = round(100*totalwronglength/totalcoveredmononucs, 3)
+        if totalcoveredmononucs > 0:
+            percwronglength = round(100*totalwronglength/totalcoveredmononucs, 3)
+        else:
+            percwronglength = 'NA'
         gsfh.write("Number of mononucleotide runs with non-alternate alleles of fewer or more of the same base in the assembly: " + str(totalwronglength) + " (" + str(percwronglength) + "%)" + "\n")
-        perccomplex = round(100*totalcomplex/totalcoveredmononucs, 3)
+        if totalcoveredmononucs > 0:
+            perccomplex = round(100*totalcomplex/totalcoveredmononucs, 3)
+        else:
+            perccomplex = 'NA'
         gsfh.write("Number of mononucleotide runs with erroneous alleles other than extensions or contractions: " + str(totalcomplex) + " (" + str(perccomplex) + "%)" + "\n")
 
     return 0
@@ -558,7 +577,7 @@ def write_het_stats(bedfiles:dict, bmstats:dict, args):
             elif ppat.match(chrom):
                 alignedhap = "PAT"
             else:
-                print("Uncertain haplotype for benchmark chromosome " + chrom)
+                logger.warning("Uncertain haplotype for benchmark chromosome " + chrom)
             curallele_hap = "NA"
             if (phasetype == "SAMEHAP" and alignedhap == "MAT") or (phasetype == "ALTHAP" and alignedhap == "PAT"):
                 num_maternal = num_maternal + 1

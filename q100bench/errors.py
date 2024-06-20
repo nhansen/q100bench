@@ -2,6 +2,7 @@ import re
 import sys
 import random
 import pybedtools
+import logging
 from collections import namedtuple
 from q100bench import seqparse
 from q100bench import alignparse
@@ -9,6 +10,8 @@ from q100bench import bedtoolslib
 
 # create namedtuple for bed intervals:
 varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
+
+logger = logging.getLogger(__name__)
 
 def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparams, stats, args)->str:
 
@@ -35,7 +38,7 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
                 alignstrand = '+'
             else:
                 alignstrand = '-'
-            print("Splitting variant name " + variant.name + " and found contigname " + contigname)
+            logger.debug("Splitting variant name " + variant.name + " and found contigname " + contigname)
             varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
 
             if varname in hetsites.keys():
@@ -111,7 +114,7 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
                     newlength = len(altbases)
                     reflength = len(refbases)
                     if reflength != runlength:
-                        print("Mononuc var reflength doesn\'t match benchmark run length at " + chrom + ":" + str(start) + "-" + str(end), file=sys.stderr)
+                        logger.warning("Mononuc var reflength doesn\'t match benchmark run length at " + chrom + ":" + str(start) + "-" + str(end))
                     sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + error_type + "\n")
                     result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':error_type}
                 else: # complex error
@@ -162,7 +165,6 @@ def assess_mononuc_read_coverage(align_obj, mononucbedfile, outputdict, bedinter
                     continue
                 readname = readalign.query_name
                 if readalign.reference_start >= int(start) or readalign.reference_end <= int(end):
-                    #print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not span " + chrom + ":" + start + "-" + end)
                     continue
                 pairs = readalign.get_aligned_pairs()
                 if len(pairs) == 0:
@@ -195,11 +197,11 @@ def assess_mononuc_read_coverage(align_obj, mononucbedfile, outputdict, bedinter
                     else:
                         mononucdict[runlength][numbases][matchtype] = mononucdict[runlength][numbases][matchtype] + 1
                 else:
-                    print(readname + " is unaligned at one endpoint!")
+                    logger.debug(readname + " is unaligned at one endpoint!")
                     if readstart is None:
-                        print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not have a start")
+                        logger.warning(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not have a start")
                     if readend is None:
-                        print(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not have a end")
+                        logger.warning(readname + " " + str(readalign.reference_start) + "-" + str(readalign.reference_end) + " does not have a end")
 
             mononucline = mfh.readline()
 
@@ -245,8 +247,6 @@ def find_readpos_in_pairs(pairs, pos, ifnone="lower"):
     while ihigh - 1 > ilow and hiref >= pos and lowref <= pos:
         imid = int((ilow + ihigh)/2)
         midref = pairs[imid][1]
-        #print("Pos: " + str(pos) + " (" + str(lowref) + "/" + str(hiref) + ") " + str(imid) + "/" + str(ilow) + "/" + str(ihigh))
-        # if imid tuple has an inserted sequence
         while midref is None:
             if ifnone == "lower":
                 imid = imid - 1
@@ -307,10 +307,8 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
             stats["totalalignedbases"] = stats["totalalignedbases"] + align.reference_length
             if benchinterval is not None: # shorten aligned length contribution if necessary
                 if benchinterval.start > align.reference_start:
-                    #print("Shortening aligned read length for " + align.query_name + " by " + str(benchinterval.start - align.reference_start))
                     stats["totalalignedbases"] = stats["totalalignedbases"] + align.reference_start - benchinterval.start
                 if benchinterval.end < align.reference_end:
-                    #print("Shortening aligned read length for " + align.query_name + " by " + str(align.reference_end - benchinterval.end))
                     stats["totalalignedbases"] = stats["totalalignedbases"] - align.reference_end + benchinterval.end
 
             # TODO: clipping calc should be amended to not count if alignment endpoints are outside desired benchinterval!
@@ -387,7 +385,7 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
     
             alignsprocessed = alignsprocessed + 1
             if alignsprocessed == 100000*int(alignsprocessed/100000):
-                print("Processed " + str(alignsprocessed) + " aligns")
+                logger.debug("Processed " + str(alignsprocessed) + " aligns")
 
     if args.errorfile:
         with open(args.errorfile, "r") as efh:

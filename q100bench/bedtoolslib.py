@@ -1,6 +1,9 @@
 import os
 import re
 import pybedtools
+import logging
+
+logger = logging.getLogger(__name__)
 
 def mergebed(bedfile:str)->str:
 
@@ -28,7 +31,7 @@ def mergeintervals(intervals):
 def mergemultiplebedfiles(bedfilelist:list):
 
     if len(bedfilelist) < 2:
-        print("Cannot call mergemultiplebedfiles on less than two bed files!")
+        logger.critical("Cannot call mergemultiplebedfiles on less than two bed files!")
         exit(1)
 
     firstbedtool = pybedtools.bedtool.BedTool(bedfilelist[0])
@@ -45,7 +48,7 @@ def bedsum(intervals)->int:
 
 def intersectbed(bedfile1:str, bedfile2:str, outputfile:str, writefirst=False, writeboth=False, outerjoin=False)->str:
 
-    print("Intersecting " + bedfile1 + " and " + bedfile2 + " to create " + outputfile)
+    logger.debug("Intersecting " + bedfile1 + " and " + bedfile2 + " to create " + outputfile)
 
     command = "bedtools intersect -a " + bedfile1 + " -b " + bedfile2
     if writefirst:

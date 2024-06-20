@@ -4,6 +4,7 @@ import re
 import shutil
 import pysam
 import argparse
+import logging
 from pybedtools import BedTool
 import importlib.resources
 from pathlib import Path
@@ -22,16 +23,17 @@ from q100bench import plots
 # create namedtuple for bed intervals:
 varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
 
+logger = logging.getLogger(__name__)
 
 def check_for_bedtools():
     if shutil.which("bedtools") is None:
-        sys.print("You don\'t seem to have bedtools in your path. Please install bedtools", file=stderr)
+        logger.critical("You don\'t seem to have bedtools in your path. Please install bedtools")
         exit(1)
     return 0
 
 def check_for_R():
     if shutil.which("Rscript") is None:
-        print("You don\'t seem to have Rscript in your path. Plots will not be generated", file=stderr)
+        logger.warning("You don\'t seem to have Rscript in your path. Plots will not be generated")
         return 1
     return 0
 
@@ -60,6 +62,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('-A', '--assembly', type=str, required=False, default="test", help='name of the assembly being tested--should be query sequence in bam file')
     parser.add_argument('-B', '--benchmark', type=str, required=False, default="truth", help='name of the assembly being used as a benchmark--should be the reference sequence in the bam file')
     parser.add_argument('-c', '--config', type=str, required=False, default="benchconfig.txt", help='path to a config file specifying locations of benchmark data files')
+    parser.add_argument('--debug', action='store_true', required=False, help='print verbose output to log file for debugging purposes')
 
     return parser
 
@@ -68,7 +71,7 @@ def parse_arguments(args):
     args = parser.parse_args(args)
 
     if not args.bam and not args.paf:
-        sys.print("Must specify either a bam file with --bam or a paf file with --paf", file=sys.stderr)
+        logger.critical("Must specify either a bam file with --bam or a paf file with --paf")
         exit(1)
 
     return args
@@ -80,7 +83,7 @@ def read_config_data(args)->dict:
     configvals = {}
     if not configpath.exists():
         template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
-        print("Using resource locations from default config file " + str(template_res))
+        logger.info("Using resource locations from default config file " + str(template_res))
         with importlib.resources.as_file(template_res) as configfile:
             with open(configfile, "r") as cr:
                 configline = cr.readline()
@@ -93,7 +96,7 @@ def read_config_data(args)->dict:
                         configvals[key] = value
                     configline = cr.readline()
     else:
-        print("Using resource locations from " + configfile)
+        logger.info("Using resource locations from " + configfile)
         with open(configfile, "r") as cr:
             configline = cr.readline()
             while configline:
@@ -111,22 +114,38 @@ def main() -> None:
 
     args = parse_arguments(sys.argv[1:])
 
+    logfile = args.prefix + ".log"
+    if args.debug:
+        logging.basicConfig(filename=logfile, level=logging.DEBUG)
+        logger.info('Logging verbose output for debugging.')
+    else:
+        logging.basicConfig(filename=logfile, level=logging.INFO)
+
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT)
+
     # check for necessary installed programs and write an output directory:
     check_for_bedtools()
     no_rscript = check_for_R()
-    outputdir = output.create_output_directory(args.prefix)
 
     # dictionary of parameters from the benchmark configuration file:
     benchparams = read_config_data(args)
 
-    # dictionary of this run's output file names:
-    outputfiles = output.name_output_files(args, outputdir)
-
     # pysam objects for the benchmark and test assembly fasta files:
+    ref = Path(args.reffasta)
+    query = Path(args.queryfasta)
+    if not ref.is_file() or not query.is_file():
+        logger.critical("Ref fasta file " + args.reffasta + " and query fasta file " + args.queryfasta + " must exist and be readable")
+        exit(1)
     refobj = pysam.FastaFile(args.reffasta)
     queryobj = pysam.FastaFile(args.queryfasta)
 
-    print("Writing bed files for excluded regions, test assembly scaffold spans, lengths, N stretches, and contigs (ignoring stretches of less than " + str(args.minns) + " Ns)")
+    outputdir = output.create_output_directory(args.prefix)
+
+    # dictionary of this run's output file names:
+    outputfiles = output.name_output_files(args, outputdir)
+
+    logger.info("Step 1 (of 9): Writing bed files for excluded regions, test assembly scaffold spans, lengths, N stretches, and contigs (ignoring stretches of less than " + str(args.minns) + " Ns)")
     bedregiondict = {}
     # merged excluded regions are saved as BedTool object "allexcludedregions" in bedregiondict here:
     seqparse.write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedregiondict)
@@ -135,6 +154,9 @@ def main() -> None:
     alignobj = None
     pafaligns = None
     if args.bam:
+        if not os.access(args.bam, os.R_OK):
+            logger.critical("BAM file " + args.bam + " is not readable")
+            exit(1)
         alignobj = pysam.AlignmentFile(args.bam, "rb")
         aligndata = alignparse.read_bam_aligns(alignobj, args.minalignlength)
         rlis_aligndata = mummermethods.filter_aligns(aligndata, "target")
@@ -144,17 +166,17 @@ def main() -> None:
         rlis_aligndata = mummermethods.filter_aligns(pafaligns, "target")
 
     # find general stats about contig/scaffold lengths, N/L50's, etc.:
-    print("Writing general statistics about " + args.assembly + " assembly")
+    logger.info("Step 2 (of 9): Writing general statistics about " + args.assembly + " assembly")
     benchmark_stats = stats.write_general_assembly_stats(refobj, queryobj, bedregiondict["testnonnregions"], bedregiondict["testnregions"], outputfiles, args)
 
     # find clusters of consistent, covering alignments and calculate continuity statistics:
-    print("Assessing overall structural alignment of assembly")
+    logger.info("Step 3 (of 9): Assessing overall structural alignment of assembly")
     alignparse.assess_overall_structure(rlis_aligndata, refobj, queryobj, outputfiles, bedregiondict, benchmark_stats, args)
     structvar.write_structural_errors(refobj, queryobj, outputfiles, benchmark_stats, args)
     stats.write_aligned_cluster_stats(outputfiles, benchmark_stats, args)
 
     if not args.structureonly:
-       print("Writing bed files of regions covered by alignments of " + args.assembly + " to " + args.benchmark)
+       logger.info("Step 4 (of 9): Writing bed files of regions covered by alignments of " + args.assembly + " to " + args.benchmark)
        # read in locations of het variants in the benchmark:
        hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
        hetarrays = phasing.sort_chrom_hetsite_arrays(hetsites)
@@ -166,20 +188,20 @@ def main() -> None:
        [mergedtestmatcoveredbed, outputfiles["mergedtestmatcovered"]] = bedtoolslib.mergebed(outputfiles["testmatcovered"])
        [mergedtestpatcoveredbed, outputfiles["mergedtestpatcovered"]] = bedtoolslib.mergebed(outputfiles["testpatcovered"])
    
-       print("Writing primary alignment statistics about " + args.assembly + " assembly")
+       logger.info("Step 5 (of 9): Writing primary alignment statistics about " + args.assembly + " assembly")
        stats.write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedtestmatcoveredbed, mergedtestpatcoveredbed, outputfiles, benchmark_stats, args)
 
        if alignobj is not None:
    
            # classify variant errors as phasing or novel errors:
-           print("Writing phase switch statistics")
+           logger.info("Step 6 (of 9): Writing phase switch statistics")
            stats.write_het_stats(outputfiles, benchmark_stats, args)
-           print("Determining whether errors are switched haplotype or novel")
+           logger.info("Step 7 (of 9): Determining whether errors are switched haplotype or novel")
            errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, benchmark_stats, args)
            stats.write_qv_stats(benchmark_stats, outputfiles, args)
 
            # evaluate mononucleotide runs:
-           print("Assessing accuracy of mononucleotide runs")
+           logger.info("Step 8 (of 9): Assessing accuracy of mononucleotide runs")
            bedtoolslib.intersectbed(benchparams["mononucruns"], outputfiles["mergedtruthcovered"], outputfile=outputfiles["coveredmononucsfile"], writefirst=True)
            mononucswithvariantsbedfile = bedtoolslib.intersectbed(outputfiles["coveredmononucsfile"], outputfiles["bencherrortypebed"], outputfiles["mononucswithvariantsfile"], outerjoin=True, writeboth=True)
            mononucstats = errors.gather_mononuc_stats(outputfiles["mononucswithvariantsfile"], outputfiles["mononucstatsfile"])
@@ -187,7 +209,7 @@ def main() -> None:
     
     # plot alignment coverage across assembly and genome:
     if not no_rscript:
-        print("Creating plots")
+        logger.info("Step 9 (of 9): Creating plots")
         if not args.structureonly:
             plots.plot_benchmark_align_coverage(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
             plots.plot_testassembly_align_coverage(args.assembly, outputdir, benchparams["resourcedir"])
