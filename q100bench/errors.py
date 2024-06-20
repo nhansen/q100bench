@@ -114,7 +114,7 @@ def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
                     newlength = len(altbases)
                     reflength = len(refbases)
                     if reflength != runlength:
-                        logger.warning("Mononuc var reflength doesn\'t match benchmark run length at " + chrom + ":" + str(start) + "-" + str(end))
+                        logger.debug("Mononuc var reflength doesn\'t match benchmark run length at " + chrom + ":" + str(start) + "-" + str(end))
                     sfh.write(name + "\t" + repeatedbase + "\t" + str(runlength) + "\t" + str(newlength) + "\t" + error_type + "\n")
                     result[name] = {'base':repeatedbase, 'length':runlength, 'assemblylength':newlength, 'type':error_type}
                 else: # complex error

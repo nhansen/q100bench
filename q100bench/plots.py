@@ -41,7 +41,7 @@ def plot_svcluster_align_plots(assemblyname:str, benchname:str, outputdir:str, r
             chromosome = re.sub(r".*/*clustered_aligns\.", "", chromosome)
             chromlength = refobj.get_reference_length(chromosome)
             plotcommand = "Rscript " + str(rfile) + " " + chrombed + " " + assemblyname + " " + benchname + " " + outputdir + " " + resourcedir + " " + str(chromlength)
-            logger.info(plotcommand)
+            logger.debug(plotcommand)
             returnvalues.append(os.system(plotcommand))
     return returnvalues
 
