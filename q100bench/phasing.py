@@ -18,7 +18,6 @@ def read_hetsites(hetsitefile)->dict:
     if not hets.is_file():
         logger.error("Het site file " + hetsitefile + " does not exist so phasing analysis will be incomplete")
     else:
-        refobj = pysam.FastaFile(args.reffasta)
         with open(hetsitefile, "r") as hfh:
             hetsiteline = hfh.readline()
             while hetsiteline:
