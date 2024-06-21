@@ -209,7 +209,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     else:
                         queryallele = queryallele + queryseq[querycurrentoffset + extendright]
                     extendright = extendright + 1
-                while querycurrentoffset - 1 - extendleft >= 0 and refcurrentoffset - 1 - extendleft >= 0 and refseq[refcurrentoffset - 1 - extendleft] == queryseq[querycurrentoffset - 1 - extendleft]:
+                while querycurrentoffset - 1 - extendleft >= 0 and refcurrentoffset - 1 + oplength - extendleft >= 0 and refseq[refcurrentoffset - 1 + oplength - extendleft] == queryseq[querycurrentoffset - 1 - extendleft]:
                     refallele = queryseq[querycurrentoffset - extendleft - 1] + refallele
                     if queryallele == "*":
                         queryallele = queryseq[querycurrentoffset - extendleft - 1]
@@ -218,9 +218,9 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     extendleft = extendleft + 1
             # querycoordinate values still need to be adjusted due to widening?
             if strand == 'F':
-                querycoordinate = querystart + querycurrentoffset
+                querycoordinate = querystart + querycurrentoffset - extendleft
             else:
-                querycoordinate = queryend - querycurrentoffset
+                querycoordinate = queryend - querycurrentoffset - extendright
 
             # check neighboring bases for Ns, which can create misleading/possibly wrong variants
             # (looks as if I might be looking only at left and right bases within the query alleles here--need to check)
@@ -233,18 +233,19 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
         
             if not (matchns.match(queryallele) or matchns.match(refallele) or matchns.match(querysurroundingseq)):
                 variantname=query+"_"+str(querycoordinate+1)+"_"+refallele+"_"+queryallele+"_"+strand # positions of insertions are positions to the left of first inserted base
-                logger.debug("Variant with name " + variantname + " and queryallele " + queryallele " + queryallele + " and refallele " + refallele + " has surroungind seq " + querysurroundingseq)
+                logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+oplength+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq)
                 variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+oplength+extendright, name=variantname, vartype='INDEL', excluded=False ))
             else:
-                logger.debug("Variant with name " + variantname + " and queryallele " + queryallele " + queryallele + " and refallele " + refallele + " has surroungind seq " + querysurroundingseq + " was excluded")
+                logger.debug("Variant with name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq + " was excluded")
 
         if op == 1: # insertion
             refpos = refcurrentoffset-1;
             refallele = "*"
             queryallele = queryseq[querycurrentoffset:querycurrentoffset+oplength] # one-based querystart+querycurrentoffset to querystart+querycurrentoffset+oplength-1 if forward strand, queryend-querycurrentoffset to queryend-querycurrentoffset-oplength+1 if reverse
             #query_positions.append(querycurrentoffset)
+            extendright = 0
+            extendleft = 0
             if widen is True: # n.b. - this will *lower* the righthand coordinate of reverse strand queries by "extendright"
-                extendright = 0
                 while querycurrentoffset + extendright < queryalignlength and refcurrentoffset + extendright < refalignlength and refseq[refcurrentoffset + extendright] == queryseq[querycurrentoffset + extendright]:
                     queryallele = queryallele + refseq[refcurrentoffset + extendright]
                     if refallele == "*":
@@ -252,25 +253,39 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     else:
                         refallele = refallele + refseq[refcurrentoffset + extendright]
                     extendright = extendright + 1
+                while querycurrentoffset - 1 + oplength - extendleft >= 0 and refcurrentoffset - 1 - extendleft >= 0 and refseq[refcurrentoffset - 1 - extendleft] == queryseq[querycurrentoffset - 1 + oplength - extendleft]:
+                    queryallele = refseq[refcurrentoffset - extendleft - 1] + queryallele
+                    if refallele == "*":
+                        refallele = refseq[refcurrentoffset - extendleft - 1]
+                    else:
+                        refallele = refseq[refcurrentoffset - extendleft - 1] + refallele
+                    extendleft = extendleft + 1
             if strand == 'F':
-                querycoordinate = querystart + querycurrentoffset
+                querycoordinate = querystart + querycurrentoffset - extendleft
                 querycoordend = querycoordinate + oplength - 1 # this is potentially off by one and could be a bug (see its use below)
             else:
-                querycoordinate = queryend - querycurrentoffset
+                querycoordinate = queryend - querycurrentoffset - extendleft
                 querycoordend = querycoordinate - oplength - 1 # this is potentially off by one and could be a bug (see its use below)
 
             # check neighboring bases for Ns, which can create misleading/possibly wrong variants
             [refleftbase, refrightbase] = ["", ""]
-            if refcurrentoffset > 0:
-                refleftbase = refseq[refcurrentoffset-1]
+            if refcurrentoffset-extendleft > 0:
+                refleftbase = refseq[refcurrentoffset-1-extendleft]
+            else:
+                refleftbase = ''
             if refcurrentoffset+extendright+1 < refalignlength:
                 refrightbase = refseq[refcurrentoffset+extendright+1]
+            else:
+                refrightbase = ''
             refsurroundingseq = refleftbase + refrightbase
             
             if not (matchns.match(queryallele) or matchns.match(refallele) or matchns.match(refsurroundingseq)):
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
                 #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extendright) + "\t0,0,0\t" + alignstring
-                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart, end=refpos+refstart+extendright, name=variantname, vartype='INDEL', excluded=False ))
+                logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq)
+                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+extendright, name=variantname, vartype='INDEL', excluded=False ))
+            else:
+                logger.debug("Variant with name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq + " was excluded")
 
         # advance current positions: cases where reference coord advances (MDN=X):
         if op in [0, 2, 3, 7, 8]:

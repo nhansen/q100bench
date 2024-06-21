@@ -115,14 +115,12 @@ def main() -> None:
     args = parse_arguments(sys.argv[1:])
 
     logfile = args.prefix + ".log"
+    logformat = '%(asctime)s %(message)s'
     if args.debug:
-        logging.basicConfig(filename=logfile, level=logging.DEBUG)
+        logging.basicConfig(filename=logfile, level=logging.DEBUG, format=logformat)
         logger.info('Logging verbose output for debugging.')
     else:
-        logging.basicConfig(filename=logfile, level=logging.INFO)
-
-    FORMAT = '%(asctime)s %(message)s'
-    logging.basicConfig(format=FORMAT)
+        logging.basicConfig(filename=logfile, level=logging.INFO, format=logformat)
 
     # check for necessary installed programs and write an output directory:
     check_for_bedtools()
