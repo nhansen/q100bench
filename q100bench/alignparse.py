@@ -285,6 +285,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq)
                 variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+extendright, name=variantname, vartype='INDEL', excluded=False ))
             else:
+                variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
                 logger.debug("Variant with name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq + " was excluded")
 
         # advance current positions: cases where reference coord advances (MDN=X):
@@ -338,6 +339,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
 
 def exclude_variants(variants:list, excludedregionsobj:pybedtools.BedTool)->list:
     # create bedintervals for variants:
+    logger.debug("Excluding variants in excluded regions")
     variantbedstring = ""
     for variant in variants:
         chrom = variant.chrom

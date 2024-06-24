@@ -4,9 +4,14 @@ The q100bench python package analyses a user-supplied alignment of a test assemb
 
 The program was written by Nancy Fisher Hansen, a staff scientist in the Genome Informatics Section at the National Human Genome Research Institute (NHGRI). Nancy can be reached at nhansen@mail.nih.gov.
 
-## Install
+## Table of contents
+- [Install](#install)
+- [Getting Started](#getting-started)
+- [Outputs](#outputs)
 
-### Dependencies
+# Install
+
+## Dependencies
 
 This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots, and [bedtools](https://bedtools.readthedocs.io/en/latest/) to compare and merge intervals.
 
@@ -14,7 +19,7 @@ In addition, the program requires various BED-formatted files with data about th
 
 All other dependencies are installed by the pip installer with the commands in the previous section. Feel free to post installation issues to the issues section of this github repository.
 
-### Local Installation
+## Local Installation
 
 Until q100bench is available on PyPi and bioconda, the easiest way to use it is to install it locally. First clone this github repository:
 ```
@@ -33,5 +38,5 @@ Finally use python's pip installer to install and test a development copy for yo
 python3 -m pip install -e .
 pytest
 ```
-
+# Getting Started
 
