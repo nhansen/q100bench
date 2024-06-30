@@ -13,9 +13,9 @@ plotindellengths <- function(indellengthfile, outputdir, xlabval="Length differe
   indellengthhist <- read.table(indellengthfile, sep="\t")
   names(indellengthhist) <- c("indellength", "indelcount", "indelspermbaligned")
   
-  insertionrates <- sapply(seq(1, 10), function(i) {indellengthhist[indellengthhist$indellength==i, "indelspermbaligned"]})
-  deletionrates <- sapply(seq(-1, -10, -1), function(i) {indellengthhist[indellengthhist$indellength==i, "indelspermbaligned"]})
-  
+  insertionrates <- sapply(seq(1, 10), function(i) {if (any(indellengthhist$indellength==i)) {indellengthhist[indellengthhist$indellength==i, "indelspermbaligned"]} else {0}})
+  deletionrates <- sapply(seq(1, 10), function(i) {if (any(indellengthhist$indellength==-1*i)) {indellengthhist[indellengthhist$indellength==-1*i, "indelspermbaligned"]} else {0}})
+
   if (is.na(ymax)) {
     barplot(rbind(deletionrates, insertionrates), beside=TRUE, names.arg=seq(1,10), col=c("blue", "red"), main=titleval, xlab=xlabval, ylab=ylabval)
   }
