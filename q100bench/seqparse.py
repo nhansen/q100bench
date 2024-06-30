@@ -50,7 +50,7 @@ def write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects):
     genomebedstring = ""
     for scaffold in queryobj.references:
         scaffoldlength = queryobj.get_reference_length(scaffold)
-        scaffstring = scaffold + "\t0\t" + str(scaffoldlength - 1) + "\n"
+        scaffstring = scaffold + "\t0\t" + str(scaffoldlength) + "\n"
         genomebedstring += scaffstring
     bedobjects["testgenomeregions"] = pybedtools.BedTool(genomebedstring, from_string = True)
     bedobjects["testgenomeregions"].saveas(outputfiles["testgenomebed"])
