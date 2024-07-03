@@ -111,14 +111,13 @@ def main() -> None:
     #check_for_bedtools()
     no_rscript = check_for_R()
     
+    logfile = args.prefix + ".log"
+    logformat = '%(asctime)s %(message)s'
     if args.debug:
-        logging.basicConfig(filename=logfile, level=logging.DEBUG)
+        logging.basicConfig(filename=logfile, level=logging.DEBUG, format=logformat)
         logger.info('Logging verbose output for debugging.')
     else:
-        logging.basicConfig(filename=logfile, level=logging.INFO)
-
-    FORMAT = '%(asctime)s %(message)s'
-    logging.basicConfig(format=FORMAT)
+        logging.basicConfig(filename=logfile, level=logging.INFO, format=logformat)
 
     outputdir = output.create_output_directory(args.prefix)
     benchparams = read_config_data(args)
