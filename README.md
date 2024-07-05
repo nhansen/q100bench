@@ -97,3 +97,16 @@ Plot title names for the test assembly haplotype and the benchmark assembly are 
 
 ## readbench sequencing read evaluation outputs
 
+### General statistics file
+
+A file called "<readset_name>.generalstats.txt" will report the total number of aligned read bases, the total number of clipped read bases, the total number of discrepancies within alignments (with a rate of discprepancies per aligned megabase), and the breakdown of these discrepancies into substitution and indel changes.
+
+### Tab-delimited statistics files
+
+* <readset_name>.singlenucerrorstats.txt - strand-specific nucleotide changes with the number observed and the rate they occur per aligned megabase. The first base in the reported change is the benchmark base (complemented if the read aligns along the reverse strand) and the second is the base reported within the read
+* <readset_name>.indelerrorstats.txt - a tab-delimited file with the size of the observed insertion or deletion (negative is when bases from the benchmark are deleted in the read, positive when there are inserted bases in the read), the number observed, and the number observed per aligned megabase
+* <readset_name>.readerrors.txt - a BED-formatted file with the locations of all tallied discrepancies between reads and the benchmark genome (keep in mind that when the --downsample option is used, these will not include all errors in all reads, just the ones in alignments that pass the downsampling threshold)
+
+### Plots
+
+* <readset_name>.indelsizestats.pdf - a histogram of the observed rates of indel discrepancies per aligned megabase of read
