@@ -7,7 +7,7 @@ The program was written by Nancy Fisher Hansen, a staff scientist in the Genome 
 ## Table of contents
 - [Install](#install)
 - [Getting Started](#getting-started)
-- [Outputs](#outputs)
+- [Program Outputs](#program-outputs)
 
 # Install
 
@@ -40,7 +40,7 @@ pytest
 ```
 # Getting Started
 
-## Evaluating diploid assemblies
+## Evaluating haplotypes of diploid assemblies
 
 At this point, the q100bench program is written to evaluate a BAM-formatted file of alignments of a single haplotype of a diploid assembly to a diploid benchmark genome (e.g., hg002v1.0.1). We recommend aligning each haplotype of the diploid assembly separately to the diploid benchmark using minimap2 with the "-x asm5" preset. To evaluate each haplotype the program usage is
 
@@ -56,4 +56,44 @@ To report and plot statistics about discrepancies between a set of sequencing re
 
 Because it is evaluating more alignments than for an assembly evaluation, the readbench command takes longer to run than the q100bench command. For this reason, it has a "--downsample" option which allows the user to pass a fraction between 0 and 1.0 that will cause read alignments to be randomly downsampled to include only that fraction of the alignments in its accuracy calculations. As with the q100bench command, information about options can be obtained with "readbench --help".
 
+# Program Outputs
+
+All q100bench programs create an output directory named with the prefix passed to the program with the --prefix (or -p) option. Within that directory will be a general statistics file, BED files, and pdf-formatted plots.
+
+## q100bench assembly evaluation outputs
+
+### General statistics file
+
+A file called "<assemblyhaplotype_name>.generalstats.txt" will contain general statistics about the assembly haplotype. The haplotype fasta file is first split into contigs anywhere the sequence contains at least 10 consecutive Ns (this value can be modified with the option --minns), and the number of scaffolds and contigs, the total bases within them, and statistics like N50/L50, NG50/LG50, and auNG are reported.
+
+Then, the program evaluates the user-supplied alignments of the haplotype to the benchmark genome, and reports similar statistics (NGA50/LGA50/auNGA) for these alignments, as well as the total number of haplotype bases aligned to each of the two benchmark haplotypes.
+
+For each of the benchmark heterozygote sites provided in the benchmark's heterozygote bed file, the program will determine which of the two parental benchmark alleles is present in any of the haplotype alignments that cover the site. Then, for individual contig alignments, it will tally the number of times heterozygous sites within the alignment switch from maternal to paternal or vice-versa. From these switches and the lengths of the alignments, a switch rate is calculated and reported.
+
+In evaluating accuracy, q100bench tallies the number of discrepancies within primary alignments, and determines whether each represents the alternate allele of a heterozygous site. It then reports numbers of substitution and indel discrepancies and the number of these that match or don't match the alternate haplotype. From the total number of discrepancies and the total number of aligned bases, it reports a phred-scaled quality value (QV).
+
+For each homopolymer run in the benchmark's mononucleotide run file, the program examines the assembly alignments that intersect the homopolymer region. If the alignment has no discrepancies, it is considered "correct". If not and the assembly has a same-base run of a different length, its length is tallied, and if it has a different sequence, it is tallied as "complex". In the general statistics file, these categories are reported as "correct", "fewer or more of the same base", or "erroneous alleles other than extensions or contractions".
+
+### BED files
+
+The BED-formatted files produced by q100bench include the following:
+
+* excludedregions.<benchmark_name>.bed - regions that were excluded from analysis, either because they were in the config file's excluded regions, were not in regions specified with --includefile, and or were excluded with the --excludefile option
+* nlocs.<assemblyhaplotype_name>.bed - regions with 10 or more Ns in the assembly haplotype (10 threshold can be modified with the --minns option)
+* <assemblyhaplotype_name>.benchcovered.<benchmark_name>.bed - regions in the benchmark assembly covered alignments of assembly haplotype scaffolds
+* testmatcovered.<assemlyhaplotype_name>.bed/testpatcovered.<assemblyhaplotype>.bed - regions in the assembly haplotype that align to maternal/paternal chromosomes in the benchmark
+* <assemblyhaplotype_name>.errortype.<benchmark_name>.bed - benchmark locations of discrepancies in alignments, along with their locations in the test assembly haplotype
+* <assemblyhaplotype_name>.mononucswithvariants.<benchmark_name>.bed - locations of benchmark mononucleotides covered by assembly alignments, with discrepancies
+
+### Plots
+
+Plot title names for the test assembly haplotype and the benchmark assembly are the names passed with the -A and -B options, respectively. The PDF-formatted plots currently produced by q100bench are the following:
+
+* <assemblyhaplotype_name>.benchcovered.<benchmark_name>.pdf - a karyotype plot of the benchmark diploid genome with maternal chromosomes on top and paternal chromosomes on bottom. Chromosomes are colored in wherever they are covered by an alignment of the tested assembly haplotype
+* <assemblyhaplotype_name>.benchcoveredwitherrors.<benchmark_name>.pdf - same as the "benchcovered" plot, but with a wiggle plot of locations of discrepancies within alignments
+* <assemblyhaplotype_name>.testcovered.<benchmark_name>.pdf - karyotype plot of test assembly scaffolds, colored to show where they align to maternal and paternal benchmark chromosomes
+* <assemblyhaplotype_name>.indelsizestats.pdf - histogram of sizes of insertions and deletions within alignments of the test assembly haplotype to the benchmark genome
+* <assemblyhaplotype_name>.mononuc_accuracy.<benchmark_name>.pdf - percent of mononucleotide runs accurate in the test assembly haplotype, plotted by mononucleotide length
+
+## readbench sequencing read evaluation outputs
 
