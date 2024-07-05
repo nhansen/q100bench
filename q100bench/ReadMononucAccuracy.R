@@ -60,7 +60,7 @@ makemultiplot <- function(maxdiff=4) {
 plotmononuchist <- function(file, plottitle="", maxdiff=4){
   differences <- diffarray(file, maxdiff=maxdiff)
   accrate <- as.integer(differences[maxdiff+1]*1000)/10
-  barplot(differences, names=seq(-1*maxdiff,maxdiff), col="blue", cex.names=1.0, main=plottitle, xlab="Difference from benchmark", ylab="Fraction of reads")
+  barplot(differences, names=seq(-1*maxdiff,maxdiff), col="blue", cex.names=1.0, main=plottitle, xlab="Difference from benchmark", ylab="Fraction of reads", ylim=c(0,1.0))
   mtext(paste(c("Accuracy: ", as.character(accrate), "%"), sep="", collapse=""), side=3, adj=0.85, line=-4)
   indelratio <- as.integer(onebaseindelratio(file)*1000)/1000
   mtext(paste(c("1bp Ins/Dels: ", as.character(indelratio)), sep="", collapse=""), side=3, adj=0.85, line=-5 )
@@ -111,12 +111,12 @@ comparison_plot_may_2024 <- function(maxdiff=4) {
   plotcolors <- palette.colors(n=6)
   par(oma=c(5,5,5,5))
   par(mfrow = c(2, 3))
-  barplot(diffarray("element_avitilongmat.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[1], cex.names=0.7, main="Element Aviti (maternal)", xlab="Difference from benchmark")
-  barplot(diffarray("illumina2x250mat_nonexc.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[2], cex.names=0.7, main="Illumina 2x250 (maternal)", xlab="Difference from benchmark")
-  barplot(diffarray("hifi_revio_pbmay24.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[3], cex.names=1.0, main="HiFi Revio/Late 2023", xlab="Difference from benchmark", ylab="Fraction of reads")
-  barplot(diffarray("ONT_Q28.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[4], cex.names=1.0, main="ONT Q28/Nov 2023", xlab="Difference from benchmark")
-  barplot(diffarray("ONT_R10_duplex_nonexc.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[5], cex.names=1.0, main="ONT R10 Duplex", xlab="Difference from benchmark")
-  barplot(diffarray("ONT_Q28_herrocorrected.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[6], cex.names=1.0, main="Herro-corrected ONT", xlab="Difference from benchmark")
+  barplot(diffarray("element_avitilongmat.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[1], cex.names=0.7, main="Element Aviti (maternal)", xlab="Difference from benchmark", ylim=c(0,1))
+  barplot(diffarray("illumina2x250mat_nonexc.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[2], cex.names=0.7, main="Illumina 2x250 (maternal)", xlab="Difference from benchmark", ylim=c(0,1))
+  barplot(diffarray("hifi_revio_pbmay24.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[3], cex.names=1.0, main="HiFi Revio/Late 2023", xlab="Difference from benchmark", ylab="Fraction of reads", ylim=c(0,1))
+  barplot(diffarray("ONT_Q28.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[4], cex.names=1.0, main="ONT Q28/Nov 2023", xlab="Difference from benchmark", ylim=c(0,1))
+  barplot(diffarray("ONT_R10_duplex_nonexc.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[5], cex.names=1.0, main="ONT R10 Duplex", xlab="Difference from benchmark", ylim=c(0,1))
+  barplot(diffarray("ONT_Q28_herrocorrected.mononuchist.txt", maxdiff=maxdiff), names=seq(-1*maxdiff, maxdiff), col=plotcolors[6], cex.names=1.0, main="Herro-corrected ONT", xlab="Difference from benchmark", ylim=c(0,1))
   mtext("Homopolymer length concordance", side = 3, line = 1, outer = TRUE)
 }
 accuracy_comparison_plot_may_2024 <- function() {
