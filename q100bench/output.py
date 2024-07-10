@@ -14,6 +14,7 @@ def create_output_directory(directory)->None:
 
 def name_output_files(args, outputdir:str)->dict:
     files = {}
+    files["nonincludedbed"] = outputdir + "/nonincludedregions." + args.benchmark + ".bed"
     files["allexcludedbed"] = outputdir + "/excludedregions." + args.benchmark + ".bed"
     files["alignplotdir"] = outputdir + "/alignmentplots"
     files["alignplotprefix"] = outputdir + "/alignmentplots/" + args.assembly + ".clustered_aligns"

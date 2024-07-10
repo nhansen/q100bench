@@ -25,6 +25,10 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
 
     excludederrorfile = outputdict["benchexcludederrortypebed"]
     xfh = open(excludederrorfile, "w")
+    if args.vcf:
+        bencherrorvcf = bencherrorfile.replace(".bed", "")
+        bencherrorvcf = bencherrorvcf + ".vcf"
+        vfh = open(bencherrorvcf, "w")
 
     with open(bencherrorfile, "w") as efh:
         for variant in variants:
@@ -48,10 +52,21 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
                 errortype = 'CONSENSUS'
                 errortypecolor = '0,0,255'
 
+            benchvarstart = variant.start
+            benchvarend = variant.end
+            if refallele == "*":
+                benchvarstart = benchvarstart - 1
+
             if variant.excluded:
-                xfh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+                xfh.write(variant.chrom + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+                if args.vcf:
+                    vcfrecord = vcf_format(variant, refobj, queryobj)
+                    vfh.write(vcfrecord)
             else:
-                efh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+                efh.write(variant.chrom + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+                if args.vcf:
+                    vcfrecord = vcf_format(variant, refobj, queryobj)
+                    vfh.write(vcfrecord)
 
             tfh.write(contigname + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + variant.name + "\t1000\t" + alignstrand + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + varname + "\n")
             stats["totalerrorsinaligns"] = stats["totalerrorsinaligns"] + 1
@@ -75,8 +90,54 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
                 else:
                     stats["indellengthcounts"][lengthdiff] = 1
     tfh.close()
+    xfh.close()
+
+    if args.vcf:
+        vfh.close()
 
     return stats
+
+def vcf_format(variant, refobj, queryobj):
+
+    chrom = variant.chrom
+    start = variant.start # zero-based
+    refpos = start + 1
+    namefields = variant.name.split("_")
+    numfields = len(namefields)
+    contigname = "_".join(namefields[0:numfields-4])
+    contigpos = int(namefields[-4])
+    refallele = namefields[-3]
+    altallele = namefields[-2]
+    if namefields[-1] == "F":
+        alignstrand = '+'
+    else:
+        alignstrand = '-'
+    filterfield = 'PASS'
+    if variant.excluded:
+        filterfield = 'EXCLUDED'
+
+    refallele = refallele.replace("*", "")
+    altallele = altallele.replace("*", "")
+    while len(refallele) > 0 and len(altallele) > 0 and refallele[-1] == altallele[-1]:
+        refallele = refallele[:-1]
+        altallele = altallele[:-1]
+
+    if refallele == "" or altallele == "":
+        refpos = refpos - 1
+        refallele = refobj.fetch(reference=chrom, start=refpos-1, end=refpos) + refallele
+        refallele = refallele.upper()
+        if alignstrand == '+':
+            contigpos = contigpos - 1
+            altallele = queryobj.fetch(reference=contigname, start=contigpos-1, end=contigpos) + altallele
+            altallele = altallele.upper()
+        else:
+            contigend = contigpos + len(altallele)
+            altbase = queryobj.fetch(reference=contigname, start=contigend-1, end=contigend)
+            altbase = seqparse.revcomp(altbase)
+            altbase = altbase.upper()
+            altallele = altbase + altallele
+
+    return chrom + "\t" + str(refpos) + "\t" + variant.name + "\t" + refallele + "\t" + altallele + "\t.\t"  + filterfield + "\t.\tGT\t1\n"
 
 def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
 

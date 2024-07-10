@@ -11,15 +11,18 @@ logger = logging.getLogger(__name__)
 
 def write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedobjects):
 
-    write_excluded_bedfile(args, benchparams, outputfiles, bedobjects)
+    write_excluded_bedfile(refobj, args, benchparams, outputfiles, bedobjects)
     write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects)
     find_all_ns(queryobj, args, outputfiles, bedobjects)
 
-def write_excluded_bedfile(args, benchparams, outputfiles, bedobjects):
+def write_excluded_bedfile(refobj, args, benchparams, outputfiles, bedobjects):
 
     allexcludedbedfiles = []
     if args.excludefile is not None:
         allexcludedbedfiles.append(args.excludefile)
+    if args.includefile is not None:
+        write_nonincluded_file(refobj, args.includefile, outputfiles["nonincludedbed"])
+        allexcludedbedfiles.append(outputfiles["nonincludedfile"])
     if "excluderegions" in benchparams.keys():
         configexcluderegions = benchparams["excluderegions"]
         configexcludepath = Path(configexcluderegions)
@@ -54,6 +57,20 @@ def write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects):
         genomebedstring += scaffstring
     bedobjects["testgenomeregions"] = pybedtools.BedTool(genomebedstring, from_string = True)
     bedobjects["testgenomeregions"].saveas(outputfiles["testgenomebed"])
+
+    return 0
+
+def write_nonincluded_file(refobj, includedbed, nonincludedbed):
+
+    genomebedstring = ""
+    for refentry in refobj.references:
+        reflength = refobj.get_reference_length(refentry)
+        genomebedstring = genomebedstring + refentry + "\t0\t" + reflength + "\n"
+
+    bedobjects["benchgenomeregions"] = pybedtools.BedTool(genomebedstring, from_string = True)
+    bedobjects["includedregions"] = pybedtools.BedTool(includedbed)
+    bedobjects["nonincludedregions"] = bedobjects["benchgenomeregions"].subtract(bedobjects["includedregions"])
+    bedobjects["nonincludedregions"].saveas(nonincludedbed)
 
     return 0
 
@@ -134,7 +151,7 @@ def revcomp(seq:str) -> str:
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', 'M': 'N', 'K': 'N', 'R': 'N', 'W': 'N', 'Y': 'N'}
     bases = list(seq)
     bases = bases[::-1]
-    bases = [complement[base] for base in bases]
+    bases = [complement[base.upper()] for base in bases]
 
     return ''.join(bases)
 
