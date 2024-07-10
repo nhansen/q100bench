@@ -15,7 +15,7 @@ The program was written by Nancy Fisher Hansen, a staff scientist in the Genome 
 
 This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots, and [bedtools](https://bedtools.readthedocs.io/en/latest/) to compare and merge intervals. If the "Rscript" command is not in a user's path, the program will complain and then skip all plotting. If the "bedtools" command isn't in the user's path, the program exits with an error.
 
-In addition, the program requires various BED-formatted files with data about the benchmark assembly. For the Q100 benchmark assembly hg002v1.0.1, a tarball of these files is available on [AWS](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/polishing/HG002/v1.0/benchmark/resources/hg002v1.0.1.resources.tar.gz). Once downloaded, the tarball should be unpacked and the locations of files should be included in the config file passed to the program.
+In addition, the program requires various BED-formatted files with data about the benchmark assembly. For the Q100 benchmark assembly hg002v1.0.1, a tarball of these files is available on [AWS](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/polishing/HG002/v1.1/benchmark/resources/hg002v1.1.resources.tar.gz). Once downloaded, the tarball should be unpacked and the locations of files should be included in the config file passed to the program.
 
 All other dependencies are installed by the pip installer with the commands in the next section called "Local Installation". Feel free to post installation issues to the issues section of this github repository.
 
@@ -42,7 +42,7 @@ pytest
 
 ## Evaluating haplotypes of diploid assemblies
 
-At this point, the q100bench program is written to evaluate a BAM-formatted file of alignments of a single haplotype of a diploid assembly to a diploid benchmark genome (e.g., hg002v1.0.1). We recommend aligning each haplotype of the diploid assembly separately to the diploid benchmark using minimap2 with the "-x asm5" preset. To evaluate each haplotype the program usage is
+At this point, the q100bench program is written to evaluate a BAM-formatted file of alignments of a single haplotype of a diploid assembly to a diploid benchmark genome (e.g., hg002v1.1). We recommend aligning each haplotype of the diploid assembly separately to the diploid benchmark using minimap2 with the "-x asm5" preset. To evaluate each haplotype the program usage is
 
 	q100bench -b <assemblyhaplotype_vs_benchmark.bam> -r <benchmark.fasta> -q <assemblyhaplotype.fasta> -p <prefix_for_output> -A <assemblyhaplotype_name> -B <benchmark_name>
 

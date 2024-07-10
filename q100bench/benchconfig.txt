@@ -1,5 +1,5 @@
-resourcedir: /data/Phillippy/projects/HG002_diploid/benchmarking/resources
-mononucruns: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.0.1.mnr10.bed
-hetsitevariants: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.0.1.hetsites.bed
-#excluderegions: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.0.1.exclude.bed
-nstretchregions: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.0.1.ncoords.bed
+resourcedir: /benchmarking/resources
+mononucruns: /benchmarking/resources/v1.1.mnr10.bed
+hetsitevariants: /benchmarking/resources/v1.1.hetsites.bed
+excluderegions: /benchmarking/resources/v1.1.exclude.bed
+nstretchregions: /benchmarking/resources/v1.1.ncoords.bed
