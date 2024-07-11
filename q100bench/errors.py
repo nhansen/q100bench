@@ -3,6 +3,7 @@ import sys
 import random
 import pybedtools
 import logging
+import datetime
 from collections import namedtuple
 from q100bench import seqparse
 from q100bench import alignparse
@@ -29,6 +30,9 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
         bencherrorvcf = bencherrorfile.replace(".bed", "")
         bencherrorvcf = bencherrorvcf + ".vcf"
         vfh = open(bencherrorvcf, "w")
+        vcfheader = vcf_header(args)
+        vfh.write(vcfheader)
+        vfh.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + args.assembly + "\n")
 
     with open(bencherrorfile, "w") as efh:
         for variant in variants:
@@ -42,7 +46,7 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
                 alignstrand = '+'
             else:
                 alignstrand = '-'
-            logger.debug("Splitting variant name " + variant.name + " and found contigname " + contigname)
+            #logger.debug("Splitting variant name " + variant.name + " and found contigname " + contigname)
             varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
 
             if varname in hetsites.keys():
@@ -131,13 +135,27 @@ def vcf_format(variant, refobj, queryobj):
             altallele = queryobj.fetch(reference=contigname, start=contigpos-1, end=contigpos) + altallele
             altallele = altallele.upper()
         else:
-            contigend = contigpos + len(altallele)
+            if len(refallele) == 1:
+                contigend = contigpos + len(altallele)
+            else:
+                contigend = contigpos + len(altallele) + 1
             altbase = queryobj.fetch(reference=contigname, start=contigend-1, end=contigend)
             altbase = seqparse.revcomp(altbase)
             altbase = altbase.upper()
             altallele = altbase + altallele
+            logger.debug("Reverse strand empty allele adjustment: fetch query " + contigname + ":" + str(contigend) + "-" + str(contigend) + " gives " + refallele + "/" +  altallele)
+            logger.debug(chrom + "\t" + str(refpos) + "\t" + variant.name + "\t" + refallele + "\t" + altallele + "\t.\t"  + filterfield + "\t.\tGT\t1")
 
     return chrom + "\t" + str(refpos) + "\t" + variant.name + "\t" + refallele + "\t" + altallele + "\t.\t"  + filterfield + "\t.\tGT\t1\n"
+
+def vcf_header(args):
+
+    benchname = args.benchmark
+    date = datetime.datetime.now()
+    datestring = date.strftime("%Y%m%d")
+    header_string = "##fileformat=VCFv4.5\n##fileDate=" + datestring + "\n##source=q100bench\n##reference=" + benchname + "\n##FILTER=<ID=EXCLUDED, Description=\"In excluded region of the benchmark reference\">\n##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n"
+
+    return header_string
 
 def gather_mononuc_stats(coveredmononucbedfile:str, mononucstatsfile:str):
 
