@@ -12,7 +12,8 @@ args = commandArgs(trailingOnly=TRUE)
 genomename <- ifelse(!( is.na(args[1])), args[1], "year1pat")
 outputdir <- ifelse(!( is.na(args[2])), args[2], ".")
 resourcedir <- ifelse(! ( is.na(args[3])), args[3], ".")
-plottitle <- ifelse(!( is.na(args[4])), args[4], paste(c(genomename, " aligned coverage vs. v1.0.1"), sep="", collapse=""))
+benchname <- ifelse(!( is.na(args[4])), args[4], "v1.1")
+plottitle <- ifelse(!( is.na(args[5])), args[5], paste(c(genomename, " aligned coverage vs. v1.1"), sep="", collapse=""))
 genomefile <- paste(c(outputdir, "/genome.", genomename, ".bed"), sep="", collapse="")
 scaffolds <- toGRanges(genomefile)
 scaffolds <- sort(scaffolds)
@@ -36,7 +37,7 @@ pp <- getDefaultPlotParams(plot.type=1)
 pp$ideogramheight <- 100
 pp$topmargin <- 300
 
-plotname <- paste(c(outputdir, "/", genomename, ".testcovered.v1.0.1.pdf"), sep="", collapse="")
+plotname <- paste(c(outputdir, "/", genomename, ".testcovered.", benchname, ".pdf"), sep="", collapse="")
 pdf(plotname, 8.5, 11.0)
 #kp <- plotKaryotype(genome=scaffolds,chromosomes=paste0("chr", c(1:22, "X", "Y")), plot.type=1, main=plottitle)
 kp <- plotKaryotype(genome=scaffolds, plot.type=1, chromosomes=chroms, main=plottitle, cex=0.5, plot.params=pp)
