@@ -10,13 +10,13 @@ library(karyoploteR)
 args = commandArgs(trailingOnly=TRUE)
 
 genomename <- ifelse(!( is.na(args[1])), args[1], "year1pat")
-benchname <- ifelse(!( is.na(args[2])), args[2], "v1.0.1")
+benchname <- ifelse(!( is.na(args[2])), args[2], "v1.1")
 outputdir <- ifelse(!( is.na(args[3])), args[3], ".")
-resourcedir <- ifelse(!( is.na(args[4])), args[4], ".")
-plottitle <- ifelse(!( is.na(args[5])), args[5], paste(c(benchname, " aligned coverage vs. ", genomename), sep="", collapse=""))
-#plottitle <- c("Year 1 HPRC HG002 Paternal Assembly Alignment Coverage vs. hg002v1.0.1")
-genomefile <- paste(c(resourcedir, "/v1.0.1.genome.bed"), sep="", collapse="")
+genomefile <- ifelse(!( is.na(args[4])), args[4], ".")
+nlocfile <- ifelse(!( is.na(args[5])), args[5], ".")
+plottitle <- ifelse(!( is.na(args[6])), args[6], paste(c(benchname, " aligned coverage vs. ", genomename), sep="", collapse=""))
 benchgenome <- toGRanges(genomefile)
+nlocranges <- toGRanges(nlocfile)
 
 maternalchroms <- paste0("chr", c(1:22, "X"), "_MATERNAL")
 paternalchroms <- paste0("chr", c(1:22, "Y"), "_PATERNAL")
@@ -26,10 +26,7 @@ benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.", benchn
 benchcoveredranges <- toGRanges(benchcoveredfile)
 benchcovereddf <- read.table(benchcoveredfile, header=FALSE, sep="\t")
 
-nlocfile <- paste(c(resourcedir, "/v1.0.1.ncoords.bed"), sep="", collapse="")
-nlocranges <- toGRanges(nlocfile)
-
-errorfile <- paste(c(outputdir, "/", genomename, ".errortype.v1.0.1.bed"), sep="", collapse="")
+errorfile <- paste(c(outputdir, "/", genomename, ".errortype.", benchname, ".bed"), sep="", collapse="")
 errorsites <- read.table(errorfile, header=FALSE, sep="\t")
 names(errorsites) <- c("chrom", "start", "end", "errorname", "score", "strand", "widestart", "wideend", "rgbcolor", "errortype", "assemblyerrorname")
 namefieldlengths <- sapply(seq(1, length(errorsites$chrom)), function(x) {length(strsplit(errorsites$errorname[x], split="_")[[1]])})
@@ -100,12 +97,12 @@ plot_coverage_vs_benchmark <- function(phasingerrorgranges=NA, snperrorgranges=N
   }
 }
 
-covgplotname <- paste(c(outputdir, "/", genomename, ".benchcovered.v1.0.1.pdf"), sep="", collapse="")
+covgplotname <- paste(c(outputdir, "/", genomename, ".benchcovered.", benchname, ".pdf"), sep="", collapse="")
 pdf(covgplotname, 8.5, 11.0)
 plot_coverage_vs_benchmark()
 dev.off()
 
-errorplotname <- paste(c(outputdir, "/", genomename, ".benchcoveredwitherrors.v1.0.1.pdf"), sep="", collapse="")
+errorplotname <- paste(c(outputdir, "/", genomename, ".benchcoveredwitherrors.", benchname, ".pdf"), sep="", collapse="")
 pdf(errorplotname, 8.5, 11.0)
 plot_coverage_vs_benchmark(phasingerrorgranges, snperrorgranges, indelerrorgranges)
 dev.off()

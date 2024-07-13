@@ -15,6 +15,7 @@ def write_genome_bedfiles(queryobj, refobj, args, benchparams, outputfiles, bedo
     write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects)
     find_all_ns(queryobj, args, outputfiles, bedobjects)
 
+# write_excluded_bedfile function is written for assembly benchmarking only, not read benchmarking:
 def write_excluded_bedfile(refobj, args, benchparams, outputfiles, bedobjects):
 
     allexcludedbedfiles = []
@@ -47,6 +48,32 @@ def write_excluded_bedfile(refobj, args, benchparams, outputfiles, bedobjects):
     bedobjects["allexcludedregions"].saveas(outputfiles["allexcludedbed"])
 
     return 0
+
+# write_included_bedfile function is written for read benchmarking only, not assembly benchmarking:
+def write_included_bedfile(refobj, args, benchparams, outputfiles):
+
+    if args.regions != "":
+        benchintervals = pybedtools.BedTool(args.regions)
+        logger.info("Restricting evaluation to read sequence aligning to regions in " + args.regions)
+    else:
+        genomebedstring = ""
+        for chrom in refobj.references:
+            chromlength = refobj.get_reference_length(chrom)
+            genomebedstring = genomebedstring + chrom + "\t0\t" + str(chromlength) + "\n"
+        benchintervals = pybedtools.BedTool(genomebedstring, from_string = True)
+
+    if "excluderegions" in benchparams.keys():
+        configexcluderegions = benchparams["excluderegions"]
+        configexcludepath = Path(configexcluderegions)
+        if configexcludepath.is_file():
+            excludeintervals = pybedtools.BedTool(configexcludepath)
+            logger.info("Not including read bases aligned to regions excluded in " + configexcluderegions)
+            benchintervals = benchintervals.subtract(excludeintervals)
+
+    benchintervals.saveas(outputfiles["includedbedfile"])
+    logger.info("Benchmark regions included in this analysis are written to file " + outputfiles["includedbedfile"])
+
+    return benchintervals
 
 def write_test_genome_bedfile(queryobj, args, outputfiles, bedobjects):
 

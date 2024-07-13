@@ -47,6 +47,7 @@ def name_output_files(args, outputdir:str)->dict:
 
 def name_read_stats_files(args, outputdir:str)->dict:
     files = {}
+    files["includedbedfile"] = outputdir + "/" + args.readsetname + ".includedregions." + args.benchmark + ".bed"
     files["mononucstatsfile"] = outputdir + "/" + args.readsetname + ".mononucstats.txt"
     files["mononuchistfile"] = outputdir + "/" + args.readsetname + ".mononuchist.txt"
     files["mononuccompositionfile"] = outputdir + "/" + args.readsetname + ".mononuccomposition.txt"

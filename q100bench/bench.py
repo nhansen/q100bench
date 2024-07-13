@@ -211,7 +211,7 @@ def main() -> None:
     if not no_rscript:
         logger.info("Step 9 (of 9): Creating plots")
         if not args.structureonly:
-            plots.plot_benchmark_align_coverage(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
+            plots.plot_benchmark_align_coverage(args.assembly, args.benchmark, outputdir, benchparams)
             plots.plot_testassembly_align_coverage(args.assembly, outputdir, benchparams["resourcedir"])
             plots.plot_assembly_error_stats(args.assembly, args.benchmark, outputdir)
             if alignobj is not None:

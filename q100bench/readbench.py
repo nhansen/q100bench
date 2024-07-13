@@ -123,17 +123,13 @@ def main() -> None:
     benchparams = read_config_data(args)
 
     hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
-    benchintervals = None
-    if args.regions != "":
-        benchintervals = pybedtools.bedtool.BedTool(args.regions)
-        logger.info("Restricting evaluation to read sequence aligning to regions in " + args.regions)
-    else:
-        logger.debug(args)
 
     alignobj = pysam.AlignmentFile(args.bam, "rb")
     refobj = pysam.FastaFile(args.reffasta)
 
     outputfiles = output.name_read_stats_files(args, outputdir)
+
+    benchintervals = seqparse.write_included_bedfile(refobj, args, benchparams, outputfiles)
 
     # evaluate mononucleotide runs:
     if not args.nomononucs:

@@ -6,10 +6,12 @@ import importlib.resources
 
 logger = logging.getLogger(__name__)
 
-def plot_benchmark_align_coverage(assemblyname:str, benchname:str, outputdir:str, resourcedir:str):
+def plot_benchmark_align_coverage(assemblyname:str, benchname:str, outputdir:str, benchparams:dict):
     rfile_res = importlib.resources.files("q100bench").joinpath('BenchCoveragePlot.R')
     with importlib.resources.as_file(rfile_res) as rfile:
-        plotcommand = "Rscript " + str(rfile) + " " + assemblyname + " " + benchname + " " + outputdir + " " + resourcedir
+        genomefile = benchparams["genomeregions"]
+        nlocfile = benchparams["nstretchregions"]
+        plotcommand = "Rscript " + str(rfile) + " " + assemblyname + " " + benchname + " " + outputdir + " " + genomefile + " " + nlocfile
         logger.info(plotcommand)
         returnvalue = os.system(plotcommand)
     return returnvalue
