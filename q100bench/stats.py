@@ -468,27 +468,33 @@ def write_qv_stats(benchmark_stats:dict, alignedscorecounts:list, snverrorscorec
 
     snvtypestring = ""
     totaltypesnverrors = 0
-    for errortype in sorted(benchmark_stats["singlebasecounts"].keys()):
-        typeerrors = benchmark_stats["singlebasecounts"][errortype]
-        snvtypeerrorspermb = typeerrors/totalassemblybasesinaligns*1000000
-        snvtypestring = snvtypestring + errortype + "\t" + str(typeerrors) + "\t" + str(snvtypeerrorspermb) + "\n"
-        totaltypesnverrors = totaltypesnverrors + typeerrors
-    snverrorspermb = int(totaltypesnverrors/totalassemblybasesinaligns*1000000)
+    if totalassemblybasesinaligns > 0:
+        for errortype in sorted(benchmark_stats["singlebasecounts"].keys()):
+            typeerrors = benchmark_stats["singlebasecounts"][errortype]
+            snvtypeerrorspermb = typeerrors/totalassemblybasesinaligns*1000000
+            snvtypestring = snvtypestring + errortype + "\t" + str(typeerrors) + "\t" + str(snvtypeerrorspermb) + "\n"
+            totaltypesnverrors = totaltypesnverrors + typeerrors
+        snverrorspermb = int(totaltypesnverrors/totalassemblybasesinaligns*1000000)
     
-    with open(bedfiles["snvstatsfile"], "w") as sfh:
-        sfh.write(snvtypestring)
+        with open(bedfiles["snvstatsfile"], "w") as sfh:
+            sfh.write(snvtypestring)
+    else:
+        logger.info("Not writing statistics regarding substitutions because no bases aligned!")
 
-    indellengthstring = ""
-    totalhistindelerrors = 0
-    for indellength in sorted(benchmark_stats["indellengthcounts"].keys()):
-        indelcount = benchmark_stats["indellengthcounts"][indellength]
-        indelerrorspermb = indelcount/totalassemblybasesinaligns*1000000
-        indellengthstring = indellengthstring + str(indellength) + "\t" + str(indelcount) + "\t" + str(indelerrorspermb) + "\n"
-        totalhistindelerrors = totalhistindelerrors + indelcount
-    indelerrorspermb = int(totalhistindelerrors/totalassemblybasesinaligns*1000000)
-
-    with open(bedfiles["indelstatsfile"], "w") as ifh:
-        ifh.write(indellengthstring)
+    if totalassemblybasesinaligns > 0:
+        indellengthstring = ""
+        totalhistindelerrors = 0
+        for indellength in sorted(benchmark_stats["indellengthcounts"].keys()):
+            indelcount = benchmark_stats["indellengthcounts"][indellength]
+            indelerrorspermb = indelcount/totalassemblybasesinaligns*1000000
+            indellengthstring = indellengthstring + str(indellength) + "\t" + str(indelcount) + "\t" + str(indelerrorspermb) + "\n"
+            totalhistindelerrors = totalhistindelerrors + indelcount
+        indelerrorspermb = int(totalhistindelerrors/totalassemblybasesinaligns*1000000)
+    
+        with open(bedfiles["indelstatsfile"], "w") as ifh:
+            ifh.write(indellengthstring)
+    else:
+        logger.info("Not writing statistics regarding indels because no bases aligned!")
 
     generalstatsfile = bedfiles["generalstatsfile"]
     with open(generalstatsfile, "a") as gsfh:
