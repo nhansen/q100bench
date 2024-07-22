@@ -131,6 +131,10 @@ def main() -> None:
 
     benchintervals = seqparse.write_included_bedfile(refobj, args, benchparams, outputfiles)
 
+    if args.downsample is not None:
+        logger.info("Downsampling to fraction " + str(args.downsample) + " of reads")
+
+
     # evaluate mononucleotide runs:
     if not args.nomononucs:
         logger.info("Assessing accuracy of mononucleotide runs")
@@ -146,7 +150,8 @@ def main() -> None:
         logger.debug(outputfiles["readerrorfile"])
         errorstats = errors.assess_read_align_errors(alignobj, refobj, outputfiles["readerrorfile"], benchintervals, hetsites, args)
         stats.write_read_error_summary(errorstats, outputfiles)
-        plots.plot_read_error_stats(args.readsetname, args.benchmark, outputdir)
+        if len(errorstats["alignedqualscorecounts"]) > 0:
+            plots.plot_read_error_stats(args.readsetname, args.benchmark, outputdir)
 
 
 if __name__ == "__main__":

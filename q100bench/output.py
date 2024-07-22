@@ -42,6 +42,7 @@ def name_output_files(args, outputdir:str)->dict:
     files["coveredhetsitealleles"] = outputdir + "/" + args.benchmark + ".coveredhetalleles." + args.assembly + ".bed"
     files["snvstatsfile"] = outputdir + "/" + args.assembly + ".singlenucerrorstats.txt"
     files["indelstatsfile"] = outputdir + "/" + args.assembly + ".indelerrorstats.txt"
+    files["qvstatsfile"] = outputdir + "/" + args.assembly + ".qvstats.txt"
 
     return files
 
@@ -57,5 +58,6 @@ def name_read_stats_files(args, outputdir:str)->dict:
     files["errorstatsfile"] = outputdir + "/" + args.readsetname + ".generalstats.txt"
     files["snvstatsfile"] = outputdir + "/" + args.readsetname + ".singlenucerrorstats.txt"
     files["indelstatsfile"] = outputdir + "/" + args.readsetname + ".indelerrorstats.txt"
+    files["qvstatsfile"] = outputdir + "/" + args.readsetname + ".errorqvstats.txt"
 
     return files

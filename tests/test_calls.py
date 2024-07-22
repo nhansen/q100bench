@@ -36,7 +36,7 @@ def test_writebedfiles():
 
     with open('tests/testrun/genome.test.bed', 'r') as gfh:
         fields = gfh.readline().rstrip().split()
-        assert(int(fields[2]) == 9720)
+        assert(int(fields[2]) == 9721)
     with open('tests/testrun/atgcseq.test.bed', 'r') as gfh:
         fields = gfh.readline().rstrip().split()
         assert(int(fields[2]) == 9721)

@@ -32,6 +32,14 @@ def plot_mononuc_accuracy(assemblyname:str, outputdir:str, resourcedir:str):
         returnvalue = os.system(plotcommand)
     return returnvalue
 
+def plot_qv_score_concordance(assemblyname:str, benchname:str, outputdir:str, resourcedir:str):
+    rfile_res = importlib.resources.files("q100bench").joinpath('PlotAssemblyQualValueAccuracy.R')
+    with importlib.resources.as_file(rfile_res) as rfile:
+        plotcommand = "Rscript " + str(rfile) + " " + assemblyname + " " + benchname + " " + outputdir + " " + resourcedir
+        logger.info(plotcommand)
+        returnvalue = os.system(plotcommand)
+    return returnvalue
+
 def plot_svcluster_align_plots(assemblyname:str, benchname:str, outputdir:str, resourcedir:str, refobj):
     rfile_res = importlib.resources.files("q100bench").joinpath('PlotChromAligns.R')
 
@@ -67,6 +75,14 @@ def plot_read_mononuc_stats(readsetname:str, genomename:str, outputdir:str):
     rfile_res = importlib.resources.files("q100bench").joinpath('ReadMononucAccuracy.R')
     with importlib.resources.as_file(rfile_res) as rfile:
         plotcommand = "Rscript " + str(rfile) + " " + readsetname + " " + genomename + " " + outputdir
+        logger.info(plotcommand)
+        returnvalue = os.system(plotcommand)
+    return returnvalue
+
+def plot_read_qv_score_concordance(readsetname:str, benchname:str, outputdir:str, resourcedir:str):
+    rfile_res = importlib.resources.files("q100bench").joinpath('PlotAssemblyQualValueAccuracy.R')
+    with importlib.resources.as_file(rfile_res) as rfile:
+        plotcommand = "Rscript " + str(rfile) + " " + readsetname + " " + benchname + " " + outputdir + " " + resourcedir
         logger.info(plotcommand)
         returnvalue = os.system(plotcommand)
     return returnvalue

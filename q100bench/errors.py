@@ -10,7 +10,7 @@ from q100bench import alignparse
 from q100bench import bedtoolslib
 
 # create namedtuple for bed intervals:
-varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded', 'qvscore']) 
 
 logger = logging.getLogger(__name__)
 
@@ -61,18 +61,22 @@ def classify_errors(refobj, queryobj, variants, hetsites, outputdict, benchparam
             if refallele == "*":
                 benchvarstart = benchvarstart - 1
 
+            varqvscore = "1000"
+            if variant.qvscore is not None:
+                varqvscore = str(variant.qvscore)
+
             if variant.excluded:
-                xfh.write(variant.chrom + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+                xfh.write(variant.chrom + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + varname + "\t" + varqvscore + "\t" + alignstrand + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
                 if args.vcf:
                     vcfrecord = vcf_format(variant, refobj, queryobj)
                     vfh.write(vcfrecord)
             else:
-                efh.write(variant.chrom + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
+                efh.write(variant.chrom + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + varname + "\t" + varqvscore + "\t" + alignstrand + "\t" + str(benchvarstart) + "\t" + str(benchvarend) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + variant.name + "\n")
                 if args.vcf:
                     vcfrecord = vcf_format(variant, refobj, queryobj)
                     vfh.write(vcfrecord)
 
-            tfh.write(contigname + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + variant.name + "\t1000\t" + alignstrand + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + varname + "\n")
+            tfh.write(contigname + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + variant.name + "\t" + varqvscore + "\t" + alignstrand + "\t" + str(pos-1) + "\t" + str(pos - 1 + len(altallele)) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.vartype + "\t" + varname + "\n")
             stats["totalerrorsinaligns"] = stats["totalerrorsinaligns"] + 1
                 
             # tally statistics for non-phasing errors:
@@ -367,6 +371,9 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
     stats["totalerrorsinaligns"] = 0
     stats["singlebasecounts"] = {}
     stats["indellengthcounts"] = {}
+    stats["alignedqualscorecounts"] = []
+    stats["snverrorqualscorecounts"] = []
+    stats["indelerrorqualscorecounts"] = []
     alignsprocessed = 0
 
     # are we dealing with just a set of regions? or the whole genome?
@@ -412,7 +419,7 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                 hetsitealleles = {} # no need to track het site alleles in this context
                 queryobj = None
     
-                read_variants = alignparse.align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, True)
+                read_variants = alignparse.align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, stats["alignedqualscorecounts"], stats["snverrorqualscorecounts"], stats["indelerrorqualscorecounts"], True)
     
                 for variant in read_variants:
                     namefields = variant.name.split("_")
@@ -427,6 +434,10 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                     else:
                         alignstrand = '-'
                     varname = variant.chrom + "_" + str(int(variant.start) + 1) + "_" + refallele + "_" + altallele
+                    varqvscore = "1000"
+                    if variant.qvscore is not None:
+                        varqvscore = str(variant.qvscore)
+
         
                     if varname in hetsitedict.keys():
                         errortype = 'HET'
@@ -460,7 +471,7 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                             else:
                                 stats["indellengthcounts"][lengthdiff] = 1
     
-                    refh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t1000\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.name + "\n")
+                    refh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t" + varqvscore + "\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.name + "\n")
     
             alignsprocessed = alignsprocessed + 1
             if alignsprocessed == 100000*int(alignsprocessed/100000):

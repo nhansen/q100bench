@@ -21,7 +21,7 @@ from q100bench import mummermethods
 from q100bench import plots
 
 # create namedtuple for bed intervals:
-varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded', 'qvscore']) 
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def main() -> None:
        hetsites = phasing.read_hetsites(benchparams["hetsitevariants"])
        hetarrays = phasing.sort_chrom_hetsite_arrays(hetsites)
        
-       [refcoveredbed, querycoveredbed, variants, hetsitealleles] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["coveredhetsitealleles"], bedregiondict["allexcludedregions"], args)
+       [refcoveredbed, querycoveredbed, variants, hetsitealleles, alignedscorecounts, snverrorscorecounts, indelerrorscorecounts] = alignparse.write_bedfiles(alignobj, pafaligns, refobj, queryobj, hetarrays, outputfiles["testmatcovered"], outputfiles["testpatcovered"], outputfiles["truthcovered"], outputfiles["coveredhetsitealleles"], bedregiondict["allexcludedregions"], args)
 
        # create merged unique outputfiles:
        [mergedtruthcoveredbed, outputfiles["mergedtruthcovered"]] = bedtoolslib.mergebed(outputfiles["truthcovered"])
@@ -198,7 +198,7 @@ def main() -> None:
            stats.write_het_stats(outputfiles, benchmark_stats, args)
            logger.info("Step 7 (of 9): Determining whether errors are switched haplotype or novel")
            errors.classify_errors(refobj, queryobj, variants, hetsites, outputfiles, benchparams, benchmark_stats, args)
-           stats.write_qv_stats(benchmark_stats, outputfiles, args)
+           stats.write_qv_stats(benchmark_stats, alignedscorecounts, snverrorscorecounts, indelerrorscorecounts, outputfiles, args)
 
            # evaluate mononucleotide runs:
            logger.info("Step 8 (of 9): Assessing accuracy of mononucleotide runs")
@@ -216,6 +216,8 @@ def main() -> None:
             plots.plot_assembly_error_stats(args.assembly, args.benchmark, outputdir)
             if alignobj is not None:
                 plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
+                if len(alignedscorecounts) > 0:
+                    plots.plot_qv_score_concordance(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
         plots.plot_svcluster_align_plots(args.assembly, args.benchmark, outputfiles["alignplotdir"], benchparams["resourcedir"], refobj)
 
 

@@ -23,7 +23,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('--ref1', type=str, required=True, help='(indexed) reference fasta file for the first bam file')
     parser.add_argument('--ref2', type=str, required=True, help='(indexed) reference fasta file for the first bam file')
     parser.add_argument('-m', '--minalignlength', type=int, required=False, default=5000, help='minimum length of alignment required to be included in het site gathering')
-    parser.add_argument('--minhomreglength', type=int, required=False, default=20000, help='minimum length of a homozygous region to be included in the bed file of homozygous regions')
+    #parser.add_argument('--minhomreglength', type=int, required=False, default=20000, help='minimum length of a homozygous region to be included in the bed file of homozygous regions')
     parser.add_argument('--hetwindowsize', type=int, required=False, default=20000, help='window size for reporting heterozygosity levels')
     parser.add_argument('-p', '--prefix', type=str, required=False, default="hetsites", help='prefix to use in output filenames')
 
@@ -101,10 +101,13 @@ def main() -> None:
 
     args = parse_arguments(sys.argv[1:])
 
+    # read aligns from BAM files
+    # coords dictionaries have keys that are the query coordinates and values that are the ref coordinates
     alignobj1 = pysam.AlignmentFile(args.bam1, "rb")
     coords1 = read_aligns(alignobj1, args)
     alignobj2 = pysam.AlignmentFile(args.bam2, "rb")
     coords2 = read_aligns(alignobj2, args)
+    # refs
     refobj1 = pysam.FastaFile(args.ref1)
     refobj2 = pysam.FastaFile(args.ref2)
 

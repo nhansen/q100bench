@@ -2,6 +2,7 @@ import re
 import pysam
 import pybedtools
 import logging
+import statistics
 from collections import namedtuple
 from pathlib import Path
 from q100bench import seqparse
@@ -10,7 +11,7 @@ from q100bench import bedtoolslib
 from q100bench import output
 
 # create namedtuple for bed intervals:
-varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded', 'qvscore']) 
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
     user_variantfile = args.variantfile
     variants = []
     hetsitealleles = {}
+    alignedscorecounts = []
+    snverrorscorecounts = []
+    indelerrorscorecounts = []
 
     if bamobj is not None:
         for align in bamobj.fetch():
@@ -41,9 +45,10 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
                 querycoveredstring += query + "\t" + str(querystart - 1) + "\t" + str(queryend) + "\t" + refnamestring + "\n"
                 refcoveredstring += ref + "\t" + str(refstart - 1) + "\t" + str(refend) + "\t" + querynamestring + "\n"
                 if user_variantfile is None:
-                    variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, True))
+                    variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, alignedscorecounts, snverrorscorecounts, indelerrorscorecounts, True))
         # mark variants that are in excluded regions:
         variants = exclude_variants(variants, excludedbedobj)
+        logger.debug("Finished excluding variants in excluded regions")
     else:
         for pafdict in pafaligns:
             # all start/endpoints are 1-based
@@ -93,10 +98,10 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
             while variantline:
                 variantline = variantline.rstrip()
                 [chrom, start, end, name] = variantline.split("\t")
-                variants.append(varianttuple(chrom=chrom, start=int(start), end=int(end), name=name))
+                variants.append(varianttuple(chrom=chrom, start=int(start), end=int(end), name=name, qvscore=None))
                 variantline = vh.readline()
 
-    return [refcoveredbed, querycoveredbed, variants, hetsitealleles]
+    return [refcoveredbed, querycoveredbed, variants, hetsitealleles, alignedscorecounts, snverrorscorecounts, indelerrorscorecounts]
 
 def retrieve_align_data(align)->list:
     if align.is_reverse:
@@ -137,7 +142,7 @@ def retrieve_align_data(align)->list:
 
 # query start and query end are the lower and higher endpoints of the query seq in query coordinates (1-based)
 # regardless of orientation of the alignment
-def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, chromhetsites={}, hetsitealleles={}, widen=True)->list:
+def align_variants(align, queryobj, query:str, querystart:int, queryend:int, refobj, ref:str, refstart:int, refend:int, strand:str, chromhetsites={}, hetsitealleles={}, alignedscorecounts=[], snverrorscorecounts=[], indelerrorscorecounts=[], widen=True)->list:
 
     # coordinates are all one-based, with start at beginning of *original* sequence (not left end of the alignment)
     variantlist = []
@@ -151,6 +156,19 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
         queryseq = align.query_alignment_sequence
     else:
         queryseq = queryobj.fetch(reference=query, start=querystart-1, end=queryend).upper()
+
+    # qual scores might be None, but if they're not, add to the counts in alignedscorecounts and errorscorecounts:
+    alignedqualscores = align.query_alignment_qualities
+
+    if alignedqualscores is not None:
+        if len(alignedscorecounts)==0:
+            for i in range(100):
+                alignedscorecounts.append(0)
+                snverrorscorecounts.append(0)
+                indelerrorscorecounts.append(0)
+        for qualscorechar in alignedqualscores:
+            qualscore = int(qualscorechar)
+            alignedscorecounts[qualscore] = alignedscorecounts[qualscore] + 1
 
     refseq = refobj.fetch(reference=ref, start=refstart-1, end=refend).upper()
 
@@ -190,7 +208,13 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 if refseq[refpos] != queryseq[querypos] and refseq[refpos] != "N" and queryseq[querypos] != "N":
                     variantname=query+"_"+str(querycoordinate)+"_"+refseq[refpos]+"_"+queryseq[querypos]+"_"+strand # query's 1-based position, ref base, query base (comp if rev strand), strand
                     #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart-1) + "\t" + str(refpos+refstart) + "\t0,0,0\t" + alignstring
-                    variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-1, end=refpos+refstart, name=variantname, vartype='SNV', excluded=False))
+                    if alignedqualscores is not None:
+                        snverrorscore = int(alignedqualscores[querypos])
+                        snverrorscorecounts[snverrorscore] = snverrorscorecounts[snverrorscore] + 1
+                    else:
+                        snverrorscore = None
+                    variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-1, end=refpos+refstart, name=variantname, vartype='SNV', excluded=False, qvscore=snverrorscore))
+
                 query_positions.append(querypos)
 
         if op in [2, 3]: # deletions
@@ -216,6 +240,13 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     else:
                         queryallele = queryseq[querycurrentoffset - extendleft - 1] + queryallele
                     extendleft = extendleft + 1
+            if alignedqualscores is not None:
+                if extendleft == 0 and extendright == 0:
+                    queryquals = alignedqualscores[querycurrentoffset-1:querycurrentoffset]
+                    qualscores = [int(x) for x in queryquals]
+                else:
+                    queryquals = alignedqualscores[querycurrentoffset-extendleft:querycurrentoffset+extendright]
+                    qualscores = [int(x) for x in queryquals]
             # querycoordinate values still need to be adjusted due to widening?
             if strand == 'F':
                 querycoordinate = querystart + querycurrentoffset - extendleft
@@ -234,7 +265,20 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             if not (matchns.match(queryallele) or matchns.match(refallele) or matchns.match(querysurroundingseq)):
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand # positions of insertions are positions to the left of first inserted base
                 #logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+oplength+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq)
-                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+oplength+extendright, name=variantname, vartype='INDEL', excluded=False ))
+                indelerrorscore = None
+                if alignedqualscores is not None:
+                    if len(qualscores)==0:
+                        logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+oplength+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq + " and length of qualscores is zero!")
+                    else:
+                        numquals = len(qualscores)
+                        # if even number of qual scores, drop the top one so the lower of the two medians is chosen (rather than an average, which may not be represented in the total qv score counts)
+                        if numquals==2*int(numquals/2):
+                            qualscores.pop()
+                        medqual = int(statistics.median(qualscores))
+                        indelerrorscorecounts[medqual] = indelerrorscorecounts[medqual] + 1
+                        indelerrorscore = medqual
+
+                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+oplength+extendright, name=variantname, vartype='INDEL', excluded=False, qvscore=indelerrorscore ))
             else:
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand # positions of insertions are positions to the left of first inserted base
                 logger.debug("Variant with name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq + " was excluded")
@@ -243,12 +287,17 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             refpos = refcurrentoffset-1;
             refallele = "*"
             queryallele = queryseq[querycurrentoffset:querycurrentoffset+oplength] # one-based querystart+querycurrentoffset to querystart+querycurrentoffset+oplength-1 if forward strand, queryend-querycurrentoffset to queryend-querycurrentoffset-oplength+1 if reverse
+            if alignedqualscores is not None:
+                queryquals = alignedqualscores[querycurrentoffset:querycurrentoffset+oplength]
+                qualscores = [int(x) for x in queryquals]
             #query_positions.append(querycurrentoffset)
             extendright = 0
             extendleft = 0
             if widen is True: # n.b. - this will *lower* the righthand coordinate of reverse strand queries by "extendright"
                 while querycurrentoffset + extendright < queryalignlength and refcurrentoffset + extendright < refalignlength and refseq[refcurrentoffset + extendright] == queryseq[querycurrentoffset + extendright]:
                     queryallele = queryallele + refseq[refcurrentoffset + extendright]
+                    if alignedqualscores is not None:
+                        qualscores.append(int(alignedqualscores[querycurrentoffset + extendright]))
                     if refallele == "*":
                         refallele = refseq[refcurrentoffset + extendright]
                     else:
@@ -256,6 +305,8 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     extendright = extendright + 1
                 while querycurrentoffset - 1 + oplength - extendleft >= 0 and refcurrentoffset - 1 - extendleft >= 0 and refseq[refcurrentoffset - 1 - extendleft] == queryseq[querycurrentoffset - 1 + oplength - extendleft]:
                     queryallele = refseq[refcurrentoffset - extendleft - 1] + queryallele
+                    if alignedqualscores is not None:
+                        qualscores.insert(0, int(alignedqualscores[querycurrentoffset - 1 + oplength - extendleft]))
                     if refallele == "*":
                         refallele = refseq[refcurrentoffset - extendleft - 1]
                     else:
@@ -284,7 +335,16 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
                 #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extendright) + "\t0,0,0\t" + alignstring
                 logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq)
-                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+extendright, name=variantname, vartype='INDEL', excluded=False ))
+                indelerrorscore = None
+                if alignedqualscores is not None:
+                    numquals = len(qualscores)
+                    # if even number of qual scores, drop the top one so the lower of the two medians is chosen (rather than an average, which may not be represented in the total qv score counts)
+                    if numquals==2*int(numquals/2):
+                        qualscores.pop()
+                    medqual = int(statistics.median(qualscores))
+                    indelerrorscorecounts[medqual] = indelerrorscorecounts[medqual] + 1
+                    indelerrorscore = medqual
+                variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+extendright, name=variantname, vartype='INDEL', excluded=False, qvscore=indelerrorscore ))
             else:
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
                 logger.debug("Variant with name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq + " was excluded")
@@ -340,28 +400,37 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
 
 def exclude_variants(variants:list, excludedregionsobj:pybedtools.BedTool)->list:
     # create bedintervals for variants:
-    logger.debug("Excluding variants in excluded regions")
-    variantbedstring = ""
+    logger.debug("Excluding lots of variants in excluded regions")
+    numvariants = len(variants)
+    logger.debug("There are " + str(numvariants) + " variants")
+    variantbedstringlist = []
     for variant in variants:
         chrom = variant.chrom
         start = variant.start
         end = variant.end
         name = variant.name
+        variantbedstringlist.append(chrom + "\t" + str(start) + "\t" + str(end) + "\t" + name + "\n")
 
-        variantbedstring = variantbedstring + chrom + "\t" + str(start) + "\t" + str(end) + "\t" + name + "\n"
-
+    variantbedstring = ''.join(variantbedstringlist)
     variantbedobj = pybedtools.BedTool(variantbedstring, from_string=True)
+    logger.debug("Created BedTool object")
     excludedvariants = bedtoolslib.intersectintervals(variantbedobj, excludedregionsobj, wa=True)
     excludeddict = {}
     for excludedvariant in excludedvariants:
         excludeddict[excludedvariant.name] = True
 
     newvariants = []
+    numexcluded = 0
+    numretained = 0
     for variant in variants:
         if variant.name in excludeddict.keys():
-            newvariants.append(varianttuple(chrom=variant.chrom, start=variant.start, end=variant.end, name=variant.name, vartype=variant.vartype, excluded = True))
+            newvariants.append(varianttuple(chrom=variant.chrom, start=variant.start, end=variant.end, name=variant.name, vartype=variant.vartype, excluded = True, qvscore=variant.qvscore))
+            numexcluded = numexcluded + 1
         else:
             newvariants.append(variant)
+            numretained = numretained + 1
+
+    logger.debug("Excluded " + str(numexcluded) + " variants and kept " + str(numretained) + " variants")
 
     return newvariants
 

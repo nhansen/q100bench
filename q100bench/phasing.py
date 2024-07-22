@@ -8,7 +8,7 @@ from collections import namedtuple
 from q100bench import seqparse
 
 # create namedtuple for bed intervals:
-varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded']) 
+varianttuple = namedtuple('varianttuple', ['chrom', 'start', 'end', 'name', 'vartype', 'excluded', 'qvscore']) 
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def read_hetsites(hetsitefile)->dict:
                     vartype = 'SNV'
                 else:
                     vartype = 'INDEL'
-                hetsites[hetsitename] = varianttuple(chrom=chrom, start=int(start), end=int(end), name=name, vartype=vartype, excluded=False)
+                hetsites[hetsitename] = varianttuple(chrom=chrom, start=int(start), end=int(end), name=name, vartype=vartype, excluded=False, qvscore=None)
                 hetsiteline = hfh.readline()
 
     return hetsites

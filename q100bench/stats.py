@@ -391,7 +391,7 @@ def write_aligned_stats(refobj, queryobj, truthcoveredbed, bedfiles:dict, bmstat
 
     return bmstats
 
-def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
+def write_qv_stats(benchmark_stats:dict, alignedscorecounts:list, snverrorscorecounts:list, indelerrorscorecounts:list, bedfiles:dict, args):
 
     variantfile = bedfiles["bencherrortypebed"]
     totalerrors = 0
@@ -501,6 +501,17 @@ def write_qv_stats(benchmark_stats:dict, bedfiles:dict, args):
         gsfh.write("Overall QV without wrong-haplotype errors: " + str(consensusqv) + "\n")
         gsfh.write("Overall QV including wrong-haplotype errors: " + str(qvwithphaseerrors) + "\n")
 
+    if len(alignedscorecounts) > 0:
+        with open(bedfiles["qvstatsfile"], "w") as qfh:
+            for i in range(len(alignedscorecounts)):
+                alignedbases = alignedscorecounts[i]
+                snverrorbases = snverrorscorecounts[i]
+                indelerrorbases = indelerrorscorecounts[i]
+                qfh.write(str(i) + "\t" + str(snverrorbases) + "\t" + str(indelerrorbases) + "\t" + str(alignedbases) + "\n")
+
+
+    generalstatsfile = bedfiles["generalstatsfile"]
+    
     return 0
 
 def write_mononuc_stats(mononucstats:dict, bedfiles:dict, benchmark_stats:dict, args):
@@ -676,8 +687,6 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
         mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex and clipped): " + str(accuracywithcomplexandclipped) + "\n")
         mofh.write("Ratio of overcalled to undercalled homopolymer runs: " + str(overcallundercallratio) + "\n")
             
-
-
 def write_read_error_summary(stats:dict, outputfiles:dict):
     totalsnverrors = 0
     totalindelerrors = 0
@@ -708,6 +717,14 @@ def write_read_error_summary(stats:dict, outputfiles:dict):
 
     with open(outputfiles["indelstatsfile"], "w") as ifh:
         ifh.write(indellengthstring)
+
+    if len(stats["alignedqualscorecounts"]) > 0:
+        with open(outputfiles["qvstatsfile"], "w") as qfh:
+            for i in range(len(stats["alignedqualscorecounts"])):
+                alignedbases = stats["alignedqualscorecounts"][i]
+                snverrorbases = stats["snverrorqualscorecounts"][i]
+                indelerrorbases = stats["indelerrorqualscorecounts"][i]
+                qfh.write(str(i) + "\t" + str(snverrorbases) + "\t" + str(indelerrorbases) + "\t" + str(alignedbases) + "\n")
 
     return 0
 
