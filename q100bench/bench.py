@@ -84,19 +84,21 @@ def read_config_data(args)->dict:
 
     configvals = {}
     if not configpath.exists():
-        template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
-        logger.info("Using resource locations from default config file " + str(template_res))
-        with importlib.resources.as_file(template_res) as configfile:
-            with open(configfile, "r") as cr:
-                configline = cr.readline()
-                while configline:
-                    p = re.compile(r'^([^#\s]+):+\s+(\S+)$')
-                    match = p.match(configline)
-                    if match:
-                        key = match.group(1)
-                        value = match.group(2)
-                        configvals[key] = value
-                    configline = cr.readline()
+        logger.critical("A config file must exist in the default location benchconfig.txt or be specified with the --config option.")
+        exit(1)
+        #template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
+        #logger.info("Using resource locations from default config file " + str(template_res))
+        #with importlib.resources.as_file(template_res) as configfile:
+            #with open(configfile, "r") as cr:
+                #configline = cr.readline()
+                #while configline:
+                    #p = re.compile(r'^([^#\s]+):+\s+(\S+)$')
+                    #match = p.match(configline)
+                    #if match:
+                        #key = match.group(1)
+                        #value = match.group(2)
+                        #configvals[key] = value
+                    #configline = cr.readline()
     else:
         logger.info("Using resource locations from " + configfile)
         with open(configfile, "r") as cr:

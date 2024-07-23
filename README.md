@@ -13,9 +13,9 @@ The program was written by Nancy Fisher Hansen, a staff scientist in the Genome 
 
 ## Dependencies
 
-This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots, and [bedtools](https://bedtools.readthedocs.io/en/latest/) to compare and merge intervals. If the "Rscript" command is not in a user's path, the program will complain and then skip all plotting. If the "bedtools" command isn't in the user's path, the program exits with an error.
+This program uses R's Rscript command with [Bioconductor](https://www.bioconductor.org/) to create plots, and [bedtools](https://bedtools.readthedocs.io/en/latest/) to compare and merge intervals. If the "Rscript" command is not in a user's path, the program will complain and then skip all plotting. If the "bedtools" command isn't in the user's path, the program exits with an error. Within R, you will need to install the "stringr" package and "karyoploteR", which is part of Bioconductor.
 
-In addition, the program requires various BED-formatted files with data about the benchmark assembly. For the Q100 benchmark assembly hg002v1.1, a tarball of these files is available on [AWS](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/polishing/HG002/v1.1/benchmark/resources/hg002v1.1.resources.tar.gz). Once downloaded, the tarball should be unpacked and the locations of files should be included in the config file passed to the program.
+In addition, the program requires various BED-formatted files with data about the benchmark assembly you are comparing to. For the Q100 benchmark assembly hg002v1.1, a tarball of these files is available on [AWS](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/polishing/HG002/v1.1/benchmark/resources/hg002v1.1.resources.tar.gz). Once downloaded, the tarball should be unpacked and the locations of files should be included in the config file passed to the program (see the section "Config file" for more details).
 
 All other dependencies are installed by the pip installer with the commands in the next section called "Local Installation". Feel free to post installation issues to the issues section of this github repository.
 
@@ -39,6 +39,12 @@ python3 -m pip install -e .
 pytest
 ```
 # Getting Started
+
+## Config file
+
+In order to evaluate heterozygous sites, mononucleotide run lengths, and other features of the benchmark, the q100bench program needs specially formatted annotation files for the benchmark genomes. For hg002v1.1, these files are contained in a tarball available on [AWS](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/polishing/HG002/v1.1/benchmark/resources/hg002v1.1.resources.tar.gz). The program reads the locations of these files from a config file, which q100bench assumes, by default, is a file called "benchconfig.txt" in your working directory. The location of this file can also be specified with the -c or --config option. If the config file is not accessible in one of these two ways, the program will complain and exit.
+
+An example config file is located in the resource tarball and contains the necessary parameters and file names. Edit that config file to specify the full path for each of the resource files (the "resourcedir" should be the path to the entire directory), and you can use that file as your config file when running the q100bench or readbench commands.
 
 ## Evaluating haplotypes of diploid assemblies
 
