@@ -3,7 +3,7 @@ library(stringr)
 #setwd("/Users/nhansen/HG002_diploid_benchmark/plots/align_plots")
 args = commandArgs(trailingOnly=TRUE)
 
-pardefault <- par()
+#pardefault <- par()
 
 chromfile <- ifelse(!( is.na(args[1])), args[1], "clustered_aligns.chr1_MATERNAL.clusters.bed")
 genomename <- ifelse(!( is.na(args[2])), args[2], "year1pat")
@@ -119,7 +119,7 @@ multiplotaligns <- function(aligns, chromlength=NA, chromplotfile=NA) {
     pdf(chromplotfile, 8.5, 11.0)
   }
 
-  par(pardefault)
+  #par(pardefault)
   numplots <- min(length(querydf$query), 4)
 
   if (numplots==1) {
