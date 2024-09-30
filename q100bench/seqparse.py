@@ -182,3 +182,61 @@ def revcomp(seq:str) -> str:
 
     return ''.join(bases)
 
+def compress_sequence(fastafile:str)->str:
+    refobj = pysam.FastaFile(fastafile)
+
+    if args.prefix is not None:
+        chainfile = args.prefix + ".hpc.chain"
+        compressedfasta = args.prefix + ".hpc.fasta"
+    else:
+        chainfile = re.sub("\.fa.*$", ".hpc.chain", fastafile)
+        chainfile = re.sub(".*/", "", chainfile)
+        compressedfasta = re.sub("\.fa.*$", ".hpc.fasta", fastafile)
+        compressedfasta = re.sub(".*/", "", compressedfasta)
+
+    if os.path.isfile(chainfile) and os.path.isfile(compressedfasta):
+        print("Using pre-existing chain file " + chainfile + " and compressed fasta file " + compressedfasta)
+    else:
+        print("Writing chain file and homopolymer compressed assembly fasta")
+
+        cfh = open(chainfile, "w")
+        with open(compressedfasta, "w") as hfh:
+            refseqs = refobj.references
+            repeatnum = 0
+            chainid = 0
+            for entry in refseqs:
+                print("Processing " + entry)
+                fullseq = refobj.fetch(entry).upper()
+                reflength = len(fullseq)
+                matches = 0
+                insertions = 0
+                lastbase = ""
+                inhpc = False
+                compressedstring = ""
+                chains = []
+                for base in fullseq:
+                    if base != lastbase:
+                        if insertions > 0:
+                            chains.append(str(matches) + "\t0\t" + str(insertions) + "\n")
+                            insertions = 0
+                            matches = 0
+                        matches = matches + 1
+                        compressedstring = compressedstring + base
+                        lastbase = base
+                    else: # hp!
+                        insertions = insertions + 1
+                if matches > 0 and insertions == 0:
+                    chains.append(str(matches) + "\n\n")
+                elif matches > 0 and insertions > 0:
+                    chains.append(str(matches) + "\t0\t" + str(insertions) + "\n0\n\n")
+
+                chainid = chainid + 1
+                hpclength = len(compressedstring)
+                cfh.write("chain 4000 " + entry + ".compressed " + str(hpclength) + " + 0 " + str(hpclength) + " " + entry + " " + str(reflength) + " + 0 " + str(reflength) + " " + str(chainid) + "\n")
+                for chainstring in chains:
+                    cfh.write(chainstring)
+                hfh.write(">" + entry + ".compressed\n" + compressedstring + "\n")
+        cfh.close()
+
+    return [compressedfasta, chainfile]
+
