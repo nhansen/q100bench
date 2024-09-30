@@ -372,6 +372,10 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
     stats["singlebasecounts"] = {}
     stats["indellengthcounts"] = {}
     stats["alignedqualscorecounts"] = []
+    # position counts are zero-based, i.e., one less than the ordinal position in the read:
+    stats["positionsnvcounts"] = []
+    stats["positionindelcounts"] = []
+    stats["positiontotalcounts"] = []
     stats["snverrorqualscorecounts"] = []
     stats["indelerrorqualscorecounts"] = []
     alignsprocessed = 0
@@ -414,7 +418,17 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                 else:
                     queryleft = queryend
                     queryright = querystart
-    
+
+                # make sure position arrays (zero-base indexed) are long enough to store position counts:
+                while len(stats["positionindelcounts"]) < queryend:
+                    stats["positionindelcounts"].append(0)
+                while len(stats["positionsnvcounts"]) < queryend:
+                    stats["positionsnvcounts"].append({})
+                while len(stats["positiontotalcounts"]) < queryend:
+                    stats["positiontotalcounts"].append(0)
+                for position in range(querystart-1, queryend):
+                    stats["positiontotalcounts"][position-1] = stats["positiontotalcounts"][position-1] + 1
+
                 hetsites = {}
                 hetsitealleles = {} # no need to track het site alleles in this context
                 queryobj = None
@@ -423,10 +437,10 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
     
                 for variant in read_variants:
                     namefields = variant.name.split("_")
+                    # this is the read position (from beginning of read, regardless of strand):
                     pos = int(namefields[-4])
                     refallele = namefields[-3]
                     altallele = namefields[-2]
-                    posend = pos + len(refallele) # this will be one base after pos for insertions, one base past end of ref allele otherwise
                     if benchinterval is not None and (variant.start < benchinterval.start or variant.end > benchinterval.end):
                         continue
                     if namefields[-1] == "F":
@@ -462,6 +476,11 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                                 stats["singlebasecounts"][snvkey] = stats["singlebasecounts"][snvkey] + 1
                             else:
                                 stats["singlebasecounts"][snvkey] = 1
+                            # add SNV error to tally at this read position:
+                            if snvkey in stats["positionsnvcounts"][pos - 1]:
+                                stats["positionsnvcounts"][pos-1][snvkey] = stats["positionsnvcounts"][pos-1][snvkey] + 1
+                            else:
+                                stats["positionsnvcounts"][pos-1][snvkey] = 1
                         else:
                             trueref = refallele.replace('*', '')
                             truealt = altallele.replace('*', '')
@@ -470,6 +489,7 @@ def assess_read_align_errors(align_obj, refobj, readerrorfile:str, bedintervals,
                                 stats["indellengthcounts"][lengthdiff] = stats["indellengthcounts"][lengthdiff] + 1
                             else:
                                 stats["indellengthcounts"][lengthdiff] = 1
+                            #stats["positionindelcounts"][pos-1] = stats["positionindelcounts][pos-1] + 1
     
                     refh.write(variant.chrom + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + varname + "\t" + varqvscore + "\t" + alignstrand + "\t" + str(variant.start) + "\t" + str(variant.end) + "\t" + errortypecolor + "\t" + errortype + "\t" + variant.name + "\n")
     
