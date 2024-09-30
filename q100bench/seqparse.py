@@ -189,9 +189,9 @@ def compress_sequence(fastafile:str)->str:
         chainfile = args.prefix + ".hpc.chain"
         compressedfasta = args.prefix + ".hpc.fasta"
     else:
-        chainfile = re.sub("\.fa.*$", ".hpc.chain", fastafile)
+        chainfile = re.sub("\\.fa.*$", ".hpc.chain", fastafile)
         chainfile = re.sub(".*/", "", chainfile)
-        compressedfasta = re.sub("\.fa.*$", ".hpc.fasta", fastafile)
+        compressedfasta = re.sub("\\.fa.*$", ".hpc.fasta", fastafile)
         compressedfasta = re.sub(".*/", "", compressedfasta)
 
     if os.path.isfile(chainfile) and os.path.isfile(compressedfasta):
