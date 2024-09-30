@@ -217,7 +217,7 @@ def main() -> None:
             plots.plot_testassembly_align_coverage(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
             plots.plot_assembly_error_stats(args.assembly, args.benchmark, outputdir)
             if alignobj is not None:
-                plots.plot_mononuc_accuracy(args.assembly, outputdir, benchparams["resourcedir"])
+                plots.plot_mononuc_accuracy(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
                 if len(alignedscorecounts) > 0:
                     plots.plot_qv_score_concordance(args.assembly, args.benchmark, outputdir, benchparams["resourcedir"])
         plots.plot_svcluster_align_plots(args.assembly, args.benchmark, outputfiles["alignplotdir"], benchparams["resourcedir"], refobj)
