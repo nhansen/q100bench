@@ -107,7 +107,6 @@ plotmononucaccuracy(mononucfile, plottitle, maxlength=40)
 dev.off()
 
 comparison_plot_may_2024 <- function(maxdiff=4) {
-  setwd("/Users/nhansen/HG002_diploid_polishing_validation/polishing_update_slides/comparison_may_2024/plots/benchresults")
   plotcolors <- palette.colors(n=6)
   par(oma=c(5,5,5,5))
   par(mfrow = c(2, 3))
@@ -120,7 +119,6 @@ comparison_plot_may_2024 <- function(maxdiff=4) {
   mtext("Homopolymer length concordance", side = 3, line = 1, outer = TRUE)
 }
 accuracy_comparison_plot_may_2024 <- function() {
-  setwd("/Users/nhansen/HG002_diploid_polishing_validation/polishing_update_slides/comparison_may_2024/plots/benchresults")
   plotcolors <- palette.colors(n=6)
   par(oma=c(5,5,5,5))
   par(mfrow = c(2, 3))

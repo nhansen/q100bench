@@ -22,9 +22,9 @@ def mergebed(bedfile:str)->str:
 
     return [mergedints, mergedbed]
 
-def mergeintervals(intervals):
+def mergeintervals(intervals, collapsecolumns='4', collapseoutput='collapse', collapsedelim='|', distance=0):
 
-    mergedints = intervals.merge(c=4, o='collapse', delim="|")
+    mergedints = intervals.merge(c=collapsecolumns, o=collapseoutput, delim=collapsedelim, d=distance)
 
     return mergedints
 
@@ -62,9 +62,9 @@ def intersectbed(bedfile1:str, bedfile2:str, outputfile:str, writefirst=False, w
 
     return [intersectbed, outputfile]
 
-def intersectintervals(intervals1, intervals2, v=False, wa=False):
+def intersectintervals(intervals1, intervals2, v=False, wa=False, wb=False, counts=False):
 
-    intersectedints = intervals1.intersect(intervals2, v=v, wa=wa)
+    intersectedints = intervals1.intersect(intervals2, v=v, wa=wa, wb=wb, c=counts)
 
     return intersectedints
 
