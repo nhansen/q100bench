@@ -535,10 +535,11 @@ def write_qv_stats(benchmark_stats:dict, alignedscorecounts:list, snverrorscorec
     if len(alignedscorecounts) > 0:
         with open(bedfiles["qvstatsfile"], "w") as qfh:
             for i in range(len(alignedscorecounts)):
-                alignedbases = alignedscorecounts[i]
-                snverrorbases = snverrorscorecounts[i]
-                indelerrorbases = indelerrorscorecounts[i]
-                qfh.write(str(i) + "\t" + str(snverrorbases) + "\t" + str(indelerrorbases) + "\t" + str(alignedbases) + "\n")
+                if i > 0 or alignedscorecounts[i] > 0:
+                    alignedbases = alignedscorecounts[i]
+                    snverrorbases = snverrorscorecounts[i]
+                    indelerrorbases = indelerrorscorecounts[i]
+                    qfh.write(str(i) + "\t" + str(snverrorbases) + "\t" + str(indelerrorbases) + "\t" + str(alignedbases) + "\n")
 
 
     generalstatsfile = bedfiles["generalstatsfile"]
@@ -756,6 +757,16 @@ def write_read_error_summary(stats:dict, outputfiles:dict):
                 snverrorbases = stats["snverrorqualscorecounts"][i]
                 indelerrorbases = stats["indelerrorqualscorecounts"][i]
                 qfh.write(str(i) + "\t" + str(snverrorbases) + "\t" + str(indelerrorbases) + "\t" + str(alignedbases) + "\n")
+    #if len(stats["positiontotalcounts"]) > 0:
+        #with open(outputfiles["positionstatsfile"], "w") as pfh:
+            ## i is the zero-based position in the read
+            #for i in range(len(stats["positionsnvcounts"])):
+                #alignedbases = stats["positiontotalcounts"][i]
+                #indelerrorbases = stats["positionindelcounts"][i]
+                #pfh.write(str(i+1) + "\t" + str(indelerrorbases) + "\tIndel\t" + str(alignedbases) + "\n")
+                #for snvkey in stats["positionsnvcounts"][i].keys():
+                    #snverrorbases = stats["positionsnvcounts"][i]
+                    #pfh.write(str(i+1) + "\t" + str(snverrorbases) + "\t" + snvkey + "\t" + str(alignedbases) + "\n")
 
     return 0
 
