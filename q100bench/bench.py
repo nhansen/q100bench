@@ -65,6 +65,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('-B', '--benchmark', type=str, required=False, default="truth", help='name of the assembly being used as a benchmark--should be the reference sequence in the bam file')
     parser.add_argument('-c', '--config', type=str, required=False, default="benchconfig.txt", help='path to a config file specifying locations of benchmark data files')
     parser.add_argument('--debug', action='store_true', required=False, help='print verbose output to log file for debugging purposes')
+    parser.add_argument('--splitaligns', action='store_true', required=False, help='beta option to attempt splitting of alignments at locations with indels of at least --maxclusterdistance')
 
     return parser
 
@@ -86,19 +87,6 @@ def read_config_data(args)->dict:
     if not configpath.exists():
         logger.critical("A config file must exist in the default location benchconfig.txt or be specified with the --config option.")
         exit(1)
-        #template_res = importlib.resources.files("q100bench").joinpath('benchconfig.txt')
-        #logger.info("Using resource locations from default config file " + str(template_res))
-        #with importlib.resources.as_file(template_res) as configfile:
-            #with open(configfile, "r") as cr:
-                #configline = cr.readline()
-                #while configline:
-                    #p = re.compile(r'^([^#\s]+):+\s+(\S+)$')
-                    #match = p.match(configline)
-                    #if match:
-                        #key = match.group(1)
-                        #value = match.group(2)
-                        #configvals[key] = value
-                    #configline = cr.readline()
     else:
         logger.info("Using resource locations from " + configfile)
         with open(configfile, "r") as cr:
@@ -159,9 +147,21 @@ def main() -> None:
         if not os.access(args.bam, os.R_OK):
             logger.critical("BAM file " + args.bam + " is not readable")
             exit(1)
-        alignobj = pysam.AlignmentFile(args.bam, "rb")
-        aligndata = alignparse.read_bam_aligns(alignobj, args.minalignlength)
-        rlis_aligndata = mummermethods.filter_aligns(aligndata, "target")
+
+        if args.splitaligns:
+            alignobj = pysam.AlignmentFile(args.bam, "rb")
+            splitbam_name = args.bam.replace(".bam", ".split.bam")
+            splitsortbam_name = args.bam.replace(".bam", ".sort.bam")
+            alignparse.split_aligns_and_sort(splitbam_name, alignobj, minindelsize=args.maxclusterdistance)
+            pysam.sort("-o", splitsortbam_name, splitbam_name)
+            pysam.index(splitsortbam_name)
+            alignobj = pysam.AlignmentFile(splitsortbam_name, "rb")
+            aligndata = alignparse.read_bam_aligns(alignobj, args.minalignlength)
+            rlis_aligndata = mummermethods.filter_aligns(aligndata, "target")
+        else:
+            alignobj = pysam.AlignmentFile(args.bam, "rb")
+            aligndata = alignparse.read_bam_aligns(alignobj, args.minalignlength)
+            rlis_aligndata = mummermethods.filter_aligns(aligndata, "target")
     else:
         pafaligns = alignparse.read_paf_aligns(args.paf, args.minalignlength)
         aligndata = pafaligns

@@ -154,6 +154,9 @@ def main() -> None:
         stats.write_read_error_summary(errorstats, outputfiles)
         if len(errorstats["alignedqualscorecounts"]) > 0:
             plots.plot_read_error_stats(args.readsetname, args.benchmark, outputdir)
+        #if len(errorstats["totalpositioncounts"]) > 0:
+            #logger.info("Not plotting position counts yet!")
+            #plots.plot_error_position_stats(args.readsetname, args.benchmark, outputdir)
 
 
 if __name__ == "__main__":

@@ -47,6 +47,7 @@ def write_bedfiles(bamobj, pafaligns, refobj, queryobj, hetsites, testmatbed, te
                 if user_variantfile is None:
                     variants.extend(align_variants(align, queryobj, query, querystart, queryend, refobj, ref, refstart, refend, strand, hetsites, hetsitealleles, alignedscorecounts, snverrorscorecounts, indelerrorscorecounts, True))
         # mark variants that are in excluded regions:
+        logger.debug("Beginning to exclude variants in excluded regions")
         variants = exclude_variants(variants, excludedbedobj)
         logger.debug("Finished excluding variants in excluded regions")
     else:
@@ -110,7 +111,7 @@ def retrieve_align_data(align)->list:
         strand = 'F'
     query = align.query_name
 
-    # number of hard clipped bases:
+    # find number of hard clipped bases:
     cigartuples = align.cigartuples
     # will use actual one-based positions, so I don't go crazy, then report BED format zero-based half open later
     # pysam's align.query_alignment_start is the 0-based coordinate within the uncomplemented hard clipped query sequence, so here we add hardclipping from the 
@@ -172,7 +173,6 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
 
     refseq = refobj.fetch(reference=ref, start=refstart-1, end=refend).upper()
 
-    alignstring = ref + ":" + str(refstart-1) + "-" + str(refend) + ";" + query + ":" + str(querystart-1) + "-" + str(queryend)
     strandsign = 1
     bedstrand = '+'
     if strand == 'R':
@@ -191,7 +191,9 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
     refalignlength = refend - refstart + 1
     queryalignlength = queryend - querystart + 1
     matchns = re.compile(".*[nN].*")
+    numops = len(alignops)
 
+    logger.debug("Traversing alignment with " + str(numops) + " cigar ops aligning " + ref + " to " + query)
     while refcurrentoffset <= refend-refstart and alignopindex < len(alignops): # traverse the alignment operator by operator
         alignop = alignops[alignopindex]
         op = alignop[0]
@@ -214,6 +216,10 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     else:
                         snverrorscore = None
                     variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-1, end=refpos+refstart, name=variantname, vartype='SNV', excluded=False, qvscore=snverrorscore))
+                elif queryseq[querypos] == 'N':
+                    if alignedqualscores is not None:
+                        snverrorscore = int(alignedqualscores[querypos])
+                        snverrorscorecounts[snverrorscore] = snverrorscorecounts[snverrorscore] + 1
 
                 query_positions.append(querypos)
 
@@ -240,6 +246,15 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     else:
                         queryallele = queryseq[querycurrentoffset - extendleft - 1] + queryallele
                     extendleft = extendleft + 1
+            
+            # querycoordinate values still need to be adjusted due to widening?
+            if strand == 'F':
+                querycoordinate = querystart + querycurrentoffset - extendleft
+            else:
+                querycoordinate = queryend - querycurrentoffset - extendright
+
+            # if there are quality scores, find the median quality across this deletion for our error tally (and to report in the output)
+            indelerrorscore = None
             if alignedqualscores is not None:
                 if extendleft == 0 and extendright == 0:
                     queryquals = alignedqualscores[querycurrentoffset-1:querycurrentoffset]
@@ -247,11 +262,16 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 else:
                     queryquals = alignedqualscores[querycurrentoffset-extendleft:querycurrentoffset+extendright]
                     qualscores = [int(x) for x in queryquals]
-            # querycoordinate values still need to be adjusted due to widening?
-            if strand == 'F':
-                querycoordinate = querystart + querycurrentoffset - extendleft
-            else:
-                querycoordinate = queryend - querycurrentoffset - extendright
+                if len(qualscores)==0:
+                    logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+oplength+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq + " and length of qualscores is zero!")
+                else:
+                    numquals = len(qualscores)
+                    # if even number of qual scores, drop the top one so the lower of the two medians is chosen (rather than an average, which may not be represented in the total qv score counts)
+                    if numquals==2*int(numquals/2):
+                        qualscores.pop()
+                    medqual = int(statistics.median(qualscores))
+                    indelerrorscorecounts[medqual] = indelerrorscorecounts[medqual] + 1
+                    indelerrorscore = medqual
 
             # check neighboring bases for Ns, which can create misleading/possibly wrong variants
             # (looks as if I might be looking only at left and right bases within the query alleles here--need to check)
@@ -264,19 +284,6 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
         
             if not (matchns.match(queryallele) or matchns.match(refallele) or matchns.match(querysurroundingseq)):
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand # positions of insertions are positions to the left of first inserted base
-                #logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+oplength+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq)
-                indelerrorscore = None
-                if alignedqualscores is not None:
-                    if len(qualscores)==0:
-                        logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+oplength+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has query surrounding seq " + querysurroundingseq + " and length of qualscores is zero!")
-                    else:
-                        numquals = len(qualscores)
-                        # if even number of qual scores, drop the top one so the lower of the two medians is chosen (rather than an average, which may not be represented in the total qv score counts)
-                        if numquals==2*int(numquals/2):
-                            qualscores.pop()
-                        medqual = int(statistics.median(qualscores))
-                        indelerrorscorecounts[medqual] = indelerrorscorecounts[medqual] + 1
-                        indelerrorscore = medqual
 
                 variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+oplength+extendright, name=variantname, vartype='INDEL', excluded=False, qvscore=indelerrorscore ))
             else:
@@ -319,6 +326,17 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 querycoordinate = queryend - querycurrentoffset - extendleft
                 querycoordend = querycoordinate - oplength - 1 # this is potentially off by one and could be a bug (see its use below)
 
+            # if there are quality scores, find the median quality across this insertion for our error tally (and to report in the output)
+            indelerrorscore = None
+            if alignedqualscores is not None:
+                numquals = len(qualscores)
+                # if even number of qual scores, drop the top one so the lower of the two medians is chosen (rather than an average, which may not be represented in the total qv score counts)
+                if numquals==2*int(numquals/2):
+                    qualscores.pop()
+                medqual = int(statistics.median(qualscores))
+                indelerrorscorecounts[medqual] = indelerrorscorecounts[medqual] + 1
+                indelerrorscore = medqual
+
             # check neighboring bases for Ns, which can create misleading/possibly wrong variants
             [refleftbase, refrightbase] = ["", ""]
             if refcurrentoffset-extendleft > 0:
@@ -335,15 +353,6 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
                 #additionalfields = "0\t" + bedstrand + "\t" + str(refpos+refstart) + "\t" + str(refpos+refstart+extendright) + "\t0,0,0\t" + alignstring
                 logger.debug("Variant with pos " + ref + ":" + str(refpos+refstart-extendleft) + "-" + str(refpos+refstart+extendright) + " name " + variantname + " and queryallele " + queryallele + " and refallele " + refallele + " has ref surrounding seq " + refsurroundingseq)
-                indelerrorscore = None
-                if alignedqualscores is not None:
-                    numquals = len(qualscores)
-                    # if even number of qual scores, drop the top one so the lower of the two medians is chosen (rather than an average, which may not be represented in the total qv score counts)
-                    if numquals==2*int(numquals/2):
-                        qualscores.pop()
-                    medqual = int(statistics.median(qualscores))
-                    indelerrorscorecounts[medqual] = indelerrorscorecounts[medqual] + 1
-                    indelerrorscore = medqual
                 variantlist.append(varianttuple(chrom=ref, start=refpos+refstart-extendleft, end=refpos+refstart+extendright, name=variantname, vartype='INDEL', excluded=False, qvscore=indelerrorscore ))
             else:
                 variantname=query+"_"+str(querycoordinate)+"_"+refallele+"_"+queryallele+"_"+strand
@@ -397,6 +406,175 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             hetsitealleles[hetname] = {'name':hetname, 'ref':ref, 'refstart':hetstart, 'refend':hetend, 'allele':queryallele, 'query':query, 'start':querystartcoord, 'end':queryendcoord, 'chrom':query}
 
     return variantlist
+
+def split_aligns_and_sort(splitbamname, bamobj, minindelsize=10000):
+    with pysam.AlignmentFile(splitbamname, "wb", header=bamobj.header) as sbfh:
+        for align in bamobj.fetch():
+            if align.is_secondary:
+                continue
+            splitaligns = split_align_on_indels(align, minindelsize)
+            numaligns = len(splitaligns)
+            for splitalign in splitaligns:
+                sbfh.write(splitalign)
+
+def split_align_on_indels(align, minindelsize=10000)->list:
+
+    subaligninfo = [] # array of data regarding the sub-alignments
+
+    # general stats about this alignment:
+    if align.is_reverse:
+        strand = 'R'
+    else:
+        strand = 'F'
+    query = align.query_name
+    ref = align.reference_name
+    refstart = align.reference_start + 1 # was zero-based, now one-based
+    refend = align.reference_end #  was zero-based, adding one for bed format "half open", now one-based
+    [left_softclip, right_softclip] = left_right_soft_clip(align)
+    [left_hardclip, right_hardclip] = left_right_hard_clip(align)
+    originalflag = align.flag
+    alignops = align.cigartuples
+
+    logger.debug("Alignment " + align.query_name + " to " + ref + " with soft clip " + str(left_softclip) + "/" + str(right_softclip) + " and hard clip " + str(left_hardclip) + "/" + str(right_hardclip) + " and flag " + str(originalflag))
+
+    # will we hard or soft clip the longest alignment?
+    hardcliplongest = False
+    if align.is_supplementary or (left_hardclip > 0) or (right_hardclip > 0):
+        hardcliplongest = True
+
+    # first position will begin at left-most ref/query base of the alignment (regardless of strand)
+    refcurrentoffset = 0
+    querycurrentoffset = 0
+    reflastalignend = 0 # also zero-based index for the next align segment--this is an offset from refstart
+    querylastalignend = 0 # also zero-based index for the next align segment--this is an offset from refstart
+    lastalignopindex = 0 # also zero-based index for the next align segment--this is an offset from the first cigar operator
+    if left_softclip > 0 or left_hardclip > 0:
+        lastalignopindex = 1
+    currentalignopindex = 0
+
+    segnumber = 1
+    while refcurrentoffset <= refend-refstart and currentalignopindex < len(alignops): # traverse the alignment operator by operator
+        alignop = alignops[currentalignopindex]
+        op = alignop[0]
+        oplength = alignop[1]
+
+        if op in [2, 3]: # deletions
+            # if deletion is large enough, append the portion of the alignment to the left as a sub-align, but without the deletion
+            if oplength >= minindelsize:
+                logger.debug("Align segment " + ref + ":" + str(refstart + reflastalignend) + "-" + str(refstart + refcurrentoffset) + " segment " + str(segnumber))
+                segnumber = segnumber + 1
+                subalignlength = refcurrentoffset - reflastalignend
+                subaligninfo.append({'alignedquerystart':querylastalignend, 'alignedqueryend':querycurrentoffset, 'alignedrefstart':refstart+reflastalignend, 'alignedrefend':refstart+refcurrentoffset, 'cigarops':alignops[lastalignopindex:currentalignopindex], 'subalignlength':subalignlength, 'segnum':segnumber })
+                # also need to advance the start coordinate for the next align to point beyond deletion:
+                lastalignopindex = currentalignopindex + 1
+                reflastalignend = refcurrentoffset + oplength
+                querylastalignend = querycurrentoffset
+                logger.debug("Setting querylastalignend to " + str(querylastalignend) + " after deletion of length " + str(oplength))
+
+        if op == 1: # insertion
+            # if insertion is large enough, append the portion of the alignment to the left as a split align, but without the insertion
+            if oplength >= minindelsize:
+                logger.debug("Align segment " + ref + ":" + str(refstart + reflastalignend) + "-" + str(refstart + refcurrentoffset) + " to " + str(querylastalignend) + "-" + str(querycurrentoffset) + " segment " + str(segnumber))
+                segnumber = segnumber + 1
+                subalignlength = refcurrentoffset - reflastalignend
+                subaligninfo.append({'alignedquerystart':querylastalignend, 'alignedqueryend':querycurrentoffset, 'alignedrefstart':refstart+reflastalignend, 'alignedrefend':refstart+refcurrentoffset, 'cigarops':alignops[lastalignopindex:currentalignopindex], 'subalignlength':subalignlength, 'segnum':segnumber })
+                # also need to advance the start coordinate for the next align to point beyond insertion:
+                lastalignopindex = currentalignopindex + 1
+                reflastalignend = refcurrentoffset
+                querylastalignend = querycurrentoffset + oplength
+                logger.debug("Setting querylastalignend to " + str(querylastalignend) + " after insertion of length " + str(oplength))
+        currentalignopindex = currentalignopindex + 1
+
+        # advance current positions: cases where reference coord advances (MDN=X):
+        if op in [0, 2, 3, 7, 8]:
+            refcurrentoffset = refcurrentoffset + oplength
+        # cases where query coord advances (MI=X)
+        if op in [0, 1, 7, 8]:
+            querycurrentoffset = querycurrentoffset + oplength
+
+    logger.debug("Align segment " + ref + ":" + str(refstart + reflastalignend) + "-" + str(refstart + refcurrentoffset) + " to " + str(querylastalignend) + "-" + str(querycurrentoffset) + " last segment " + str(segnumber))
+    subalignlength = refcurrentoffset - reflastalignend
+    subaligninfo.append({'alignedquerystart':querylastalignend, 'alignedqueryend':querycurrentoffset, 'alignedrefstart':refstart+reflastalignend, 'alignedrefend':refstart+refcurrentoffset, 'cigarops':alignops[lastalignopindex:currentalignopindex], 'subalignlength':subalignlength, 'segnum':segnumber })
+
+    subaligns = create_subalignobjects(align, subaligninfo, hardcliplongest)
+
+    return subaligns
+
+def count_consumed_query(cigarops)->int:
+
+    queryconsumed = 0
+    for cigartuple in cigarops:
+        opnum = cigartuple[0]
+        oplength = cigartuple[1]
+        if opnum in [0, 1, 4, 7, 8]:
+            queryconsumed = queryconsumed + oplength
+    return queryconsumed
+
+def create_subalignobjects(align, subaligninfo:list, hardcliplongest:bool)->list:
+
+    querysamseq = align.query_sequence
+    samseqlength = len(querysamseq)
+    [full_left_hardclip, full_right_hardclip] = left_right_hard_clip(align)
+    subalignobjs = []
+    longest = True
+    for aligninfo in sorted(subaligninfo, key=lambda d: d['subalignlength'], reverse=True):
+        segmentnum = str(aligninfo['segnum'])
+        #logger.debug("Processing subaligninfo segment " + segmentnum + " length " + str(aligninfo['subalignlength']))
+        newalign = pysam.AlignedSegment()
+        newalign.query_name = align.query_name
+        newalign.reference_id = align.reference_id
+        newalign.reference_start = aligninfo['alignedrefstart'] - 1
+        cigartuples = aligninfo['cigarops']
+        # soft clip the longest unless hardcliplongest was specified
+        if longest and not hardcliplongest:
+            logger.debug("Will softclip align of length " + str(aligninfo['subalignlength']) + " with start " + str(aligninfo['alignedquerystart']))
+            newalign.query_sequence = querysamseq
+            leftsoftclip = align.query_alignment_start + aligninfo['alignedquerystart']
+            rightsoftclip = samseqlength - aligninfo['alignedqueryend'] - align.query_alignment_start
+            logger.debug("Will add " + str(leftsoftclip) + " left softclip and right softclip " + str(rightsoftclip) + " to align of length " +str(aligninfo['subalignlength']) + " with sam length " + str(samseqlength))
+            if leftsoftclip > 0:
+                cigarlist = [(4, leftsoftclip)] + cigartuples
+            else:
+                cigarlist = cigartuples
+            if rightsoftclip > 0:
+                cigarlist.append([4, rightsoftclip])
+            newalign.cigartuples = cigarlist
+            for cigar in cigarlist:
+                logger.debug("CIGAR\t" + str(cigar[0]) + ":" + str(cigar[1]))
+            queryconsumedbases = count_consumed_query(cigarlist)
+            logger.debug("Query seq length is " + str(samseqlength) + " and cigar consumes " + str(queryconsumedbases))
+        else:
+            logger.debug("Will hardclip align of length " + str(aligninfo['subalignlength']))
+            lefthardclip = align.query_alignment_start + aligninfo['alignedquerystart'] + full_left_hardclip
+            righthardclip = samseqlength - aligninfo['alignedqueryend'] - align.query_alignment_start + full_right_hardclip
+            logger.debug("Will add " + str(lefthardclip) + " left hardclip and right hardclip " + str(righthardclip) + " to align of length " +str(aligninfo['subalignlength']) + " with sam length " + str(samseqlength))
+            if lefthardclip > 0:
+                cigarlist = [(5, lefthardclip)] + cigartuples
+            else:
+                cigarlist = cigartuples
+            if righthardclip > 0:
+                cigarlist.append([5, righthardclip])
+            newalign.cigartuples = cigarlist
+            query_seqstart = aligninfo['alignedquerystart'] + align.query_alignment_start
+            query_seqend = aligninfo['alignedqueryend'] + align.query_alignment_start
+            newalign.query_sequence = querysamseq[query_seqstart:query_seqend]
+            queryseqlength = query_seqend - query_seqstart
+            #logger.debug("Query sequence has length " + str(lefthardclip) + " hardclip and right hardclip " + str(righthardclip) + " to align of length " +str(aligninfo['subalignlength']))
+            newalign.cigartuples = cigarlist
+            for cigar in cigarlist:
+                logger.debug("CIGAR\t" + str(cigar[0]) + ":" + str(cigar[1]))
+            queryconsumedbases = count_consumed_query(cigarlist)
+            logger.debug("Query seq length is " + str(queryseqlength) + " and cigar consumes " + str(queryconsumedbases))
+
+        if not longest:
+            newalign.flag = align.flag | 2048
+            logger.debug("Marking align of length " + str(aligninfo['subalignlength']) + " as supplementary")
+        else:
+            newalign.flag = align.flag
+        longest = False
+        subalignobjs.append(newalign)
+
+    return subalignobjs
 
 def exclude_variants(variants:list, excludedregionsobj:pybedtools.BedTool)->list:
     # create bedintervals for variants:
@@ -523,7 +701,8 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
     # since allexcludedregions bed object is merged,can subtract out excluded bases interval by interval
     for interval in bedobjects["allexcludedregions"]:
         ref = interval.chrom
-        benchmark_stats["numnonexcludedbases"][ref] = benchmark_stats["numnonexcludedbases"][ref] - len(interval)
+        if ref in benchmark_stats["numnonexcludedbases"].keys():
+            benchmark_stats["numnonexcludedbases"][ref] = benchmark_stats["numnonexcludedbases"][ref] - len(interval)
 
     aligndict = {}
     for align in aligndata:
@@ -601,6 +780,110 @@ def assess_overall_structure(aligndata:list, refobj, queryobj, outputfiles, bedo
         benchmark_stats["alignclusters"][refentry] = refalignclusters
     
     return benchmark_stats
+
+def left_right_soft_clip(align)->list:
+    leftsoftclip = 0
+    rightsoftclip = 0
+    
+    if align.cigartuples[0][0]==4:
+        leftsoftclip = align.cigartuples[0][1]
+    if align.cigartuples[-1][0]==4:
+        rightsoftclip = align.cigartuples[-1][1]
+
+    return [leftsoftclip, rightsoftclip]
+
+def left_right_hard_clip(align)->list:
+    lefthardclip = 0
+    righthardclip = 0
+    
+    if align.cigartuples[0][0]==5:
+        lefthardclip = align.cigartuples[0][1]
+    if align.cigartuples[-1][0]==5:
+        righthardclip = align.cigartuples[-1][1]
+
+    return [lefthardclip, righthardclip]
+
+# do a quick comparison of two alignments to see if one is contained within the other, or if they are dovetail to the left, right, or both
+# function returns either: ref start/end within the first alignment where the second alignment has agreeing endpoints, but -1 for 
+# start or end if there is no agreement at that end
+def compare_alignments(align1, align2, switched=False):
+
+    # coordinates are all one-based, with start at beginning of *original* sequence (not left end of the alignment)
+    query1, query1start, query1end, ref1, ref1start, ref1end, strand1 = retrieve_align_data(align1)
+    query2, query2start, query2end, ref2, ref2start, ref2end, strand2 = retrieve_align_data(align2)
+
+    logger.debug("Comparing " + ref1 + ":" + str(ref1start) + "-" + str(ref1end) + " to " + query2 + ":" + str(query2start) + "-" + str(query2end) + "/" + strand1)
+
+    if strand1 != strand2:
+        return [-1, -1]
+
+    # for soft clipped alignments, query positions include soft clipped bases (so are larger by the amount of the soft clipping)
+    align1pairs = align1.get_aligned_pairs(matches_only=True)
+    align2pairs = align2.get_aligned_pairs(matches_only=True)
+
+    [leftsoftclip1, rightsoftclip1] = left_right_soft_clip(align1)
+    [leftsoftclip2, rightsoftclip2] = left_right_soft_clip(align2)
+
+    # for align1, ref positions in array are the second tuple element + ref1start, query pos are first tuple element + query1start
+    align1index = 0
+    align2index = 0
+    alignoverlaprefstart = None
+    alignoverlapquerystart = None
+    lastoverlaprefstart = None
+    lastoverlapquerystart = None
+    while align1index < len(align1pairs) and align2index < len(align2pairs):
+        ref1pos = align1pairs[align1index][1] + 1
+        if strand1 == 'F':
+            query1pos = align1pairs[align1index][0] + query1start
+            if leftsoftclip1 > 0:
+                query1pos = query1pos - leftsoftclip1
+        else:
+            query1pos = align1pairs[align1index][0] + query1start
+            if rightsoftclip1 > 0:
+                query1pos = query1pos - rightsoftclip1
+    
+        if not switched:
+            ref2pos = align2pairs[align2index][1] + 1
+            if strand2 == 'F':
+                query2pos = align2pairs[align2index][0] + query2start
+                if leftsoftclip2 > 0:
+                    query2pos = query2pos - leftsoftclip2
+            else:
+                query2pos = query2start + align2pairs[align2index][0]
+                if rightsoftclip2 > 0:
+                    query2pos = query2pos - rightsoftclip2
+
+        else: # need to switch ref/query
+            if strand2 == 'F':
+                ref2pos = align2pairs[align2index][0] + query2start
+                query2pos = align2pairs[align2index][1] + 1
+                if leftsoftclip2 > 0:
+                    ref2pos = ref2pos - leftsoftclip2
+            else:
+                ref2pos = align2pairs[align2index][0] + query2start
+                #query2pos = ref2end - align2pairs[align2index][1]
+                query2pos = align2pairs[align2index][1] + 1
+                if rightsoftclip2 > 0:
+                    ref2pos = ref2pos - rightsoftclip2
+
+        # based on ref positions, should we advance one index, the other, or both?
+        #if ref1start==21156327 and ref1end==34675573:
+            #print(str(ref1pos) + "\t" + str(ref2pos) + "\t" + str(query1pos) + "\t" + str(query2pos) + "\t" + str(align1index) + "\t" + str(align2index))
+        if ref1pos < ref2pos:
+            align1index = align1index + 1
+        elif ref1pos > ref2pos:
+            align2index = align2index + 1
+        elif ref1pos == ref2pos:
+            if query1pos == query2pos:
+                if alignoverlaprefstart is None:
+                    alignoverlaprefstart = ref1pos
+                    alignoverlapquerystart = query1pos
+                lastoverlaprefstart = ref1pos
+                lastoverlapquerystart = query1pos
+            align1index = align1index + 1
+            align2index = align2index + 1
+
+    return [alignoverlaprefstart, lastoverlaprefstart]
 
 def add_align_to_clusters(align:dict, alignclusters:list, maxdistance:int):
 
