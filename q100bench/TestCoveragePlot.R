@@ -25,8 +25,10 @@ if (length(chroms) > 40){
   chroms <- chroms[1:40]
 }
 
-matcoveredfile <- paste(c(outputdir, "/testmatcovered.", genomename, ".merged.bed"), sep="", collapse="")
-patcoveredfile <- paste(c(outputdir, "/testpatcovered.", genomename, ".merged.bed"), sep="", collapse="")
+#matcoveredfile <- paste(c(outputdir, "/testmatcovered.", genomename, ".merged.bed"), sep="", collapse="")
+#patcoveredfile <- paste(c(outputdir, "/testpatcovered.", genomename, ".merged.bed"), sep="", collapse="")
+matcoveredfile <- paste(c(outputdir, "/testmatcovered.", genomename, ".bed"), sep="", collapse="")
+patcoveredfile <- paste(c(outputdir, "/testpatcovered.", genomename, ".bed"), sep="", collapse="")
 matcoveredranges <- toGRanges(matcoveredfile)
 patcoveredranges <- toGRanges(patcoveredfile)
 

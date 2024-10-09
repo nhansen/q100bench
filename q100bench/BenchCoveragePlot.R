@@ -22,7 +22,8 @@ maternalchroms <- paste0("chr", c(1:22, "X"), "_MATERNAL")
 paternalchroms <- paste0("chr", c(1:22, "Y"), "_PATERNAL")
 chroms <- c(maternalchroms, paternalchroms)
 
-benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.", benchname, ".merged.bed"), sep="", collapse="")
+#benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.", benchname, ".merged.bed"), sep="", collapse="")
+benchcoveredfile <- paste(c(outputdir, "/", genomename, ".benchcovered.", benchname, ".bed"), sep="", collapse="")
 benchcoveredranges <- toGRanges(benchcoveredfile)
 benchcovereddf <- read.table(benchcoveredfile, header=FALSE, sep="\t")
 
