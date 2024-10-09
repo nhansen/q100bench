@@ -183,35 +183,40 @@ def write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedte
     hap1totalbases = bmstats['hap1totalbases'] # total MATERNAL bases in benchmark
     hap2totalbases = bmstats['hap2totalbases'] # total PATERNAL bases in benchmark
 
-    hap1_nga50 = 0
-    hap2_nga50 = 0
-    hap1_lga50 = 0
-    hap2_lga50 = 0
-    hap1_nga90 = 0
-    hap2_nga90 = 0
-    hap1_lga90 = 0
-    hap2_lga90 = 0
-    hap1_aunga = 0
-    hap2_aunga = 0
+    if hap1totalbases > 0:
+        hap1_nga50 = 0
+        hap1_lga50 = 0
+        hap1_nga90 = 0
+        hap1_lga90 = 0
+        hap1_aunga = 0
+    if hap2totalbases > 0:
+        hap2_nga50 = 0
+        hap2_lga50 = 0
+        hap2_nga90 = 0
+        hap2_lga90 = 0
+        hap2_aunga = 0
+
     for truthint in sorted(mergedtruthcoveredbed, key=lambda h: len(h), reverse=True):
         alignlength = len(truthint)
         totalrefaligned = totalrefaligned + alignlength
         numberrefaligns = numberrefaligns + 1
 
-        if totalrefaligned >= 0.5*hap1totalbases and hap1_nga50 == 0:
-            hap1_nga50 = alignlength
-            hap1_lga50 = numberrefaligns
-        if totalrefaligned >= 0.5*hap2totalbases and hap2_nga50 == 0:
-            hap2_nga50 = alignlength
-            hap2_lga50 = numberrefaligns
-        if totalrefaligned >= 0.9*hap1totalbases and hap1_nga90 == 0:
-            hap1_nga90 = alignlength
-            hap1_lga90 = numberrefaligns
-        if totalrefaligned >= 0.9*hap2totalbases and hap2_nga90 == 0:
-            hap2_nga90 = alignlength
-            hap2_lga90 = numberrefaligns
-        hap1_aunga = hap1_aunga + alignlength*alignlength/hap1totalbases
-        hap2_aunga = hap2_aunga + alignlength*alignlength/hap2totalbases
+        if hap1totalbases > 0:
+            if totalrefaligned >= 0.5*hap1totalbases and hap1_nga50 == 0:
+                hap1_nga50 = alignlength
+                hap1_lga50 = numberrefaligns
+            if totalrefaligned >= 0.9*hap1totalbases and hap1_nga90 == 0:
+                hap1_nga90 = alignlength
+                hap1_lga90 = numberrefaligns
+            hap1_aunga = hap1_aunga + alignlength*alignlength/hap1totalbases
+        if hap2totalbases > 0:
+            if totalrefaligned >= 0.5*hap2totalbases and hap2_nga50 == 0:
+                hap2_nga50 = alignlength
+                hap2_lga50 = numberrefaligns
+            if totalrefaligned >= 0.9*hap2totalbases and hap2_nga90 == 0:
+                hap2_nga90 = alignlength
+                hap2_lga90 = numberrefaligns
+            hap2_aunga = hap2_aunga + alignlength*alignlength/hap2totalbases
 
     matbenchcovered = 0
     patbenchcovered = 0
@@ -244,21 +249,25 @@ def write_merged_aligned_stats(refobj, queryobj, mergedtruthcoveredbed, mergedte
     bmstats["testmattotalcovered"] = totaltestmatcovered
     bmstats["testpattotalcovered"] = totaltestpatcovered
     bmstats["benchtotalcovered"] = totalbenchcovered
-    bmstats["mataunga"] = hap1_aunga
-    bmstats["pataunga"] = hap2_aunga
+    if hap1totalbases > 0:
+        bmstats["mataunga"] = hap1_aunga
+    if hap2totalbases > 0:
+        bmstats["pataunga"] = hap2_aunga
 
     with open(generalstatsfile, "a") as gsfh:
         gsfh.write("\nAligned contig bases:\n\n")
-        gsfh.write("NGA50 (for MATERNAL benchmark haplotype): " + str(round(hap1_nga50/1000000, 3)) + "Mb\n")
-        gsfh.write("NGA50 (for PATERNAL benchmark haplotype): " + str(round(hap2_nga50/1000000, 3)) + "Mb\n")
-        gsfh.write("LGA50 (for MATERNAL benchmark haplotype): " + str(hap1_lga50) + "\n")
-        gsfh.write("LGA50 (for PATERNAL benchmark haplotype): " + str(hap2_lga50) + "\n")
-        gsfh.write("NGA90 (for MATERNAL benchmark haplotype): " + str(round(hap1_nga90/1000000, 3)) + "Mb\n")
-        gsfh.write("NGA90 (for PATERNAL benchmark haplotype): " + str(round(hap2_nga90/1000000, 3)) + "Mb\n")
-        gsfh.write("LGA90 (for MATERNAL benchmark haplotype): " + str(hap1_lga90) + "\n")
-        gsfh.write("LGA90 (for PATERNAL benchmark haplotype): " + str(hap2_lga90) + "\n")
-        gsfh.write("auNGA (for MATERNAL benchmark haplotype): " + str(round(hap1_aunga/1000000, 3)) + "Mb\n")
-        gsfh.write("auNGA (for PATERNAL benchmark haplotype): " + str(round(hap2_aunga/1000000, 3)) + "Mb\n")
+        if hap1totalbases > 0:
+            gsfh.write("NGA50 (for MATERNAL benchmark haplotype): " + str(round(hap1_nga50/1000000, 3)) + "Mb\n")
+            gsfh.write("LGA50 (for MATERNAL benchmark haplotype): " + str(hap1_lga50) + "\n")
+            gsfh.write("NGA90 (for MATERNAL benchmark haplotype): " + str(round(hap1_nga90/1000000, 3)) + "Mb\n")
+            gsfh.write("LGA90 (for MATERNAL benchmark haplotype): " + str(hap1_lga90) + "\n")
+            gsfh.write("auNGA (for MATERNAL benchmark haplotype): " + str(round(hap1_aunga/1000000, 3)) + "Mb\n")
+        if hap2totalbases > 0:
+            gsfh.write("NGA50 (for PATERNAL benchmark haplotype): " + str(round(hap2_nga50/1000000, 3)) + "Mb\n")
+            gsfh.write("LGA50 (for PATERNAL benchmark haplotype): " + str(hap2_lga50) + "\n")
+            gsfh.write("NGA90 (for PATERNAL benchmark haplotype): " + str(round(hap2_nga90/1000000, 3)) + "Mb\n")
+            gsfh.write("LGA90 (for PATERNAL benchmark haplotype): " + str(hap2_lga90) + "\n")
+            gsfh.write("auNGA (for PATERNAL benchmark haplotype): " + str(round(hap2_aunga/1000000, 3)) + "Mb\n")
         perctestmatcovered = int(totaltestmatcovered * 1000 / bmstats['totallargecontigbases'] + 0.5) / 10
         perctestpatcovered = int(totaltestpatcovered * 1000 / bmstats['totallargecontigbases'] + 0.5) / 10
         if bmstats['hap1totalbases'] > 0 or bmstats['hap2totalbases'] > 0:
