@@ -1,4 +1,5 @@
 import os
+import subprocess
 import glob
 import re
 import logging
@@ -8,12 +9,17 @@ logger = logging.getLogger(__name__)
 
 def plot_benchmark_align_coverage(assemblyname:str, benchname:str, outputdir:str, benchparams:dict):
     rfile_res = importlib.resources.files("q100bench").joinpath('BenchCoveragePlot.R')
+    env = os.environ.copy()
+    env['LD_LIBRARY_PATH'] = os.getcwd()
+    currentdir = os.getcwd()
     with importlib.resources.as_file(rfile_res) as rfile:
         genomefile = benchparams["genomeregions"]
         nlocfile = benchparams["nstretchregions"]
         plotcommand = "Rscript " + str(rfile) + " " + assemblyname + " " + benchname + " " + outputdir + " " + genomefile + " " + nlocfile
+        print("Running " + plotcommand)
         logger.info(plotcommand)
-        returnvalue = os.system(plotcommand)
+        proc = subprocess.Popen(plotcommand, shell=True, env=env)
+        proc.wait()
     return returnvalue
 
 def plot_testassembly_align_coverage(assemblyname:str, benchname:str, outputdir:str, resourcedir:str):

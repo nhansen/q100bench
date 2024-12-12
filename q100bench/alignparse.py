@@ -203,6 +203,9 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             for blockoffset in range(oplength):
                 refpos = refcurrentoffset + blockoffset # this is distance from left-most base of the alignment
                 querypos = querycurrentoffset + blockoffset # this is distance from left-most base of the alignment
+                if refpos >= len(refseq) or querypos >= len(queryseq):
+                    print("Cigar led to position beyond end of sequence with ref pos " + str(refpos) + " and query pos " + str(querypos) + " in alignment of " + query + ":" + str(querystart) + "-" + str(queryend) + " to " + ref + ":" + str(refstart) + "-" + str(refend)) 
+                    continue
                 if strand == 'F':
                     querycoordinate = querypos + querystart
                 else:
@@ -232,14 +235,14 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             extendleft = 0
             extendright = 0
             if widen is True: # n.b. - this will *lower* the righthand coordinate of reverse strand queries by "extendright" and *lower* the lefthand coordinate of ref entries and forward strand queries by "extendleft"
-                while querycurrentoffset + extendright < queryalignlength and refcurrentoffset + extendright < refalignlength and refseq[refcurrentoffset + extendright] == queryseq[querycurrentoffset + extendright]:
+                while querycurrentoffset + extendright < queryalignlength and refcurrentoffset + extendright < refalignlength and refseq[refcurrentoffset + extendright] == queryseq[querycurrentoffset + extendright] and (strand=='F' or queryend - querycurrentoffset >= extendright):
                     refallele = refallele + queryseq[querycurrentoffset + extendright]
                     if queryallele == "*":
                         queryallele = queryseq[querycurrentoffset + extendright]
                     else:
                         queryallele = queryallele + queryseq[querycurrentoffset + extendright]
                     extendright = extendright + 1
-                while querycurrentoffset - 1 - extendleft >= 0 and refcurrentoffset - 1 + oplength - extendleft >= 0 and refseq[refcurrentoffset - 1 + oplength - extendleft] == queryseq[querycurrentoffset - 1 - extendleft]:
+                while querycurrentoffset - 1 - extendleft >= 0 and refcurrentoffset - 1 + oplength - extendleft >= 0 and refseq[refcurrentoffset - 1 + oplength - extendleft] == queryseq[querycurrentoffset - 1 - extendleft] and (strand == 'R' or querystart + querycurrentoffset >= extendleft):
                     refallele = queryseq[querycurrentoffset - extendleft - 1] + refallele
                     if queryallele == "*":
                         queryallele = queryseq[querycurrentoffset - extendleft - 1]
@@ -301,7 +304,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
             extendright = 0
             extendleft = 0
             if widen is True: # n.b. - this will *lower* the righthand coordinate of reverse strand queries by "extendright"
-                while querycurrentoffset + extendright < queryalignlength and refcurrentoffset + extendright < refalignlength and refseq[refcurrentoffset + extendright] == queryseq[querycurrentoffset + extendright]:
+                while querycurrentoffset + extendright < queryalignlength and refcurrentoffset + extendright < refalignlength and refseq[refcurrentoffset + extendright] == queryseq[querycurrentoffset + extendright] and (strand=='F' or queryend - querycurrentoffset >= extendright):
                     queryallele = queryallele + refseq[refcurrentoffset + extendright]
                     if alignedqualscores is not None:
                         qualscores.append(int(alignedqualscores[querycurrentoffset + extendright]))
@@ -310,7 +313,7 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                     else:
                         refallele = refallele + refseq[refcurrentoffset + extendright]
                     extendright = extendright + 1
-                while querycurrentoffset - 1 + oplength - extendleft >= 0 and refcurrentoffset - 1 - extendleft >= 0 and refseq[refcurrentoffset - 1 - extendleft] == queryseq[querycurrentoffset - 1 + oplength - extendleft]:
+                while querycurrentoffset - 1 + oplength - extendleft >= 0 and refcurrentoffset - 1 - extendleft >= 0 and refseq[refcurrentoffset - 1 - extendleft] == queryseq[querycurrentoffset - 1 + oplength - extendleft] and (strand=='R' or querystart + querycurrentoffset >= extendleft):
                     queryallele = refseq[refcurrentoffset - extendleft - 1] + queryallele
                     if alignedqualscores is not None:
                         qualscores.insert(0, int(alignedqualscores[querycurrentoffset - 1 + oplength - extendleft]))
@@ -323,7 +326,8 @@ def align_variants(align, queryobj, query:str, querystart:int, queryend:int, ref
                 querycoordinate = querystart + querycurrentoffset - extendleft
                 querycoordend = querycoordinate + oplength - 1 # this is potentially off by one and could be a bug (see its use below)
             else:
-                querycoordinate = queryend - querycurrentoffset - extendleft
+                #querycoordinate = queryend - querycurrentoffset - extendleft
+                querycoordinate = queryend - querycurrentoffset - extendright
                 querycoordend = querycoordinate - oplength - 1 # this is potentially off by one and could be a bug (see its use below)
 
             # if there are quality scores, find the median quality across this insertion for our error tally (and to report in the output)

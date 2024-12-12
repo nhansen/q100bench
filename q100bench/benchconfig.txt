@@ -4,3 +4,5 @@ hetsitevariants: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v
 excluderegions: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.1/v1.1.excluded_regions.bed
 nstretchregions: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.1/v1.1.ncoords.bed
 genomeregions: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.1/v1.1.genome.bed
+matmarkers: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.1/v1.1.matnotpat.k40.hap.ktab
+patmarkers: /data/Phillippy/projects/HG002_diploid/benchmarking/resources/v1.1/v1.1.patnotmat.k40.hap.ktab

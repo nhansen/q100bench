@@ -717,16 +717,32 @@ def write_read_mononuc_stats(stats:dict, outputfiles:dict, args):
             totaldeletions = totaldeletions + lengthcomposition[mononuclength]['DELERROR']
 
     with open(mononucoverviewfile, "w") as mofh:
-        noncomplexaccuracy = int(totalcorrect/(totalcorrect + totalerror)*1000)/10
-        accuracywithcomplex = int(totalcorrect/(totalcorrect + totalerror + totalcomplex)*1000)/10
-        accuracywithclipped = int(totalcorrect/(totalcorrect + totalerror + totalclipped)*1000)/10
-        accuracywithcomplexandclipped = int(totalcorrect/(totalcorrect + totalerror + totalcomplex + totalclipped)*1000)/10
-        overcallundercallratio = int(100*totalinsertions/totaldeletions)/100
-        mofh.write("Accuracy of homopolymer runs of 10 or more bases (not counting read alleles that match the alternate haplotype or are complex): " + str(noncomplexaccuracy) + "\n")
-        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex): " + str(accuracywithcomplex) + "\n")
-        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including clipped): " + str(accuracywithclipped) + "\n")
-        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex and clipped): " + str(accuracywithcomplexandclipped) + "\n")
-        mofh.write("Ratio of overcalled to undercalled homopolymer runs: " + str(overcallundercallratio) + "\n")
+        if totalcorrect + totalerror > 0:
+            noncomplexaccuracy = str(int(totalcorrect/(totalcorrect + totalerror)*1000)/10) + "%"
+        else:
+            noncomplexaccuracy = "NA"
+        if totalcorrect + totalerror + totalcomplex > 0:
+            accuracywithcomplex = str(int(totalcorrect/(totalcorrect + totalerror + totalcomplex)*1000)/10) + "%"
+        else:
+            accuracywithcomplex = "NA"
+        if totalcorrect + totalerror + totalclipped > 0:
+            accuracywithclipped = str(int(totalcorrect/(totalcorrect + totalerror + totalclipped)*1000)/10) + "%"
+        else:
+            accuracywithclipped = "NA"
+        if totalcorrect + totalerror + totalcomplex + totalclipped > 0:
+            accuracywithcomplexandclipped = str(int(totalcorrect/(totalcorrect + totalerror + totalcomplex + totalclipped)*1000)/10) + "%"
+        else:
+            accuracywithcomplexandclipped = "NA"
+
+        if totaldeletions > 0:
+            overcallundercallratio = str(int(100*totalinsertions/totaldeletions)/100) + "%"
+        else:
+            overcallundercallratio = "NA"
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (not counting read alleles that match the alternate haplotype or are complex): " + noncomplexaccuracy + "\n")
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex): " + accuracywithcomplex + "\n")
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including clipped): " + accuracywithclipped + "\n")
+        mofh.write("Accuracy of homopolymer runs of 10 or more bases (including complex and clipped): " + accuracywithcomplexandclipped + "\n")
+        mofh.write("Ratio of overcalled to undercalled homopolymer runs: " + overcallundercallratio + "\n")
             
 def write_read_error_summary(stats:dict, outputfiles:dict):
     totalsnverrors = 0
